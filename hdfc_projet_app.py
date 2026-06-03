@@ -1,80 +1,125 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-from datetime import datetime
-import base64
-from io import BytesIO
+from datetime import date
 
-st.set_page_config(page_title="HD Full Concept - Projets", layout="wide")
+st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
-DB_PATH = "hdfc_projects.db"
+# ====================== HEADER ======================
+st.markdown("""
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+        <div style="background-color: #1a1a2e; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 22px;">
+            HD FULL CONCEPT
+        </div>
+        <div>
+            <h1 style="margin: 0; font-size: 26px;">Centralisation des Projets</h1>
+            <p style="margin: 0; color: #666;">Le Son, L'Image, Le Service</p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
-def get_conn():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+st.divider()
 
-def init_db():
-    conn = get_conn()
-    c = conn.cursor()
+# ====================== SIDEBAR ======================
+with st.sidebar:
+    st.header("HD Full Concept")
     
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY, name TEXT, role TEXT)''')
+    role = st.selectbox(
+        "Votre rôle",
+        ["Administrateur", "Technicien", "Programmeur C4", "Direction"],
+        index=0
+    )
     
-    c.execute('''CREATE TABLE IF NOT EXISTS projects (
-        id INTEGER PRIMARY KEY, name TEXT, client_name TEXT, 
-        type_projet TEXT, statut TEXT, progress_pct REAL, is_c4 INTEGER)''')
+    st.caption(f"Connecté en tant que : **{role}**")
+    st.divider()
     
-    c.execute('''CREATE TABLE IF NOT EXISTS events (
-        id INTEGER PRIMARY KEY, project_id INTEGER, user_id INTEGER,
-        timestamp TEXT, event_type TEXT, description TEXT, est_resolu INTEGER)''')
+    page = st.radio("Navigation", [
+        "📊 Tableau de bord",
+        "📁 Fiche Chantier",
+        "⚡ Encodage Rapide",
+        "📅 Planning & Coordination",
+        "📈 Rapports"
+    ])
+
+# ====================== DONNÉES ======================
+projects_data = [
+    {"id": 1, "name": "Villa Uccle - Home Cinéma Premium", "client": "M. & Mme. Lambert", "type": "Home Cinéma Control4", "statut": "En cours", "progress": 72, "is_c4": True},
+    {"id": 2, "name": "Appartement Ixelles - Domotique Full C4", "client": "Famille Dubois", "type": "Domotique C4", "statut": "En cours", "progress": 45, "is_c4": True},
+    {"id": 3, "name": "Boutique HD - Signage & Visio", "client": "HD Full Concept", "type": "Signage professionnel", "statut": "En cours", "progress": 88, "is_c4": False},
+    {"id": 4, "name": "Résidence Waterloo - Salles Cinéma", "client": "M. Van der Berg", "type": "Salles de cinéma privées", "statut": "En préparation", "progress": 15, "is_c4": True},
+]
+
+events_data = [
+    {"projet": "Villa Uccle", "type": "Problème", "desc": "Câblage HDMI instable", "date": "28/05", "resolu": True},
+    {"projet": "Villa Uccle", "type": "Blocage C4", "desc": "Pairing remote SR-260", "date": "28/05", "resolu": False},
+    {"projet": "Ixelles", "type": "Étape terminée", "desc": "Découverte réseau C4", "date": "30/05", "resolu": True},
+]
+
+# ====================== PAGES ======================
+
+if page == "📊 Tableau de bord":
+    st.subheader("Vue d'ensemble des chantiers")
     
-    conn.commit()
+    df = pd.DataFrame(projects_data)
+    st.dataframe(df[["name", "client", "type", "statut", "progress"]], use_container_width=True, hide_index=True)
     
-    # Seed simple et propre
-    if c.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 0:
-        c.executemany("""INSERT INTO projects (name, client_name, type_projet, statut, progress_pct, is_c4) VALUES (?,?,?,?,?,?)""", [
-            ("Villa Uccle - Home Cinéma Premium", "M. & Mme. Lambert", "Home Cinéma Control4", "En cours", 72, 1),
-            ("Appartement Ixelles - Domotique C4", "Famille Dubois", "Domotique C4", "En cours", 45, 1),
-            ("Boutique HD - Signage", "HD Full Concept", "Signage & Visio", "En cours", 88, 0),
-            ("Résidence Waterloo - Cinéma Privé", "M. Van der Berg", "Salles de cinéma", "En préparation", 15, 1),
-        ])
+    if role == "Administrateur":
+        st.success("En tant qu'Administrateur, vous avez une vue complète sur tous les chantiers.")
+    elif role == "Technicien":
+        st.info("Vous ne voyez ici que les chantiers qui vous sont assignés (simulation).")
+
+elif page == "📁 Fiche Chantier":
+    st.subheader("Fiche Chantier détaillée")
+    
+    selected = st.selectbox("Choisir un chantier", [p["name"] for p in projects_data])
+    projet = next(p for p in projects_data if p["name"] == selected)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Client", projet["client"])
+        st.metric("Type", projet["type"])
+    with col2:
+        st.metric("Statut", projet["statut"])
+        st.progress(projet["progress"] / 100, text=f"Avancement : {projet['progress']}%")
+    
+    st.markdown("### Événements du chantier")
+    for ev in events_data:
+        if ev["projet"] in selected:
+            color = "🟢" if ev["resolu"] else "🔴"
+            st.write(f"{color} **{ev['date']}** - {ev['type']} : {ev['desc']}")
+    
+    if role in ["Administrateur", "Programmeur C4"]:
+        st.text_area("Ajouter une note / mise à jour technique")
+
+elif page == "⚡ Encodage Rapide":
+    st.subheader("⚡ Encodage Rapide (mobile friendly)")
+    
+    with st.form("encode_form"):
+        chantier = st.selectbox("Chantier", [p["name"] for p in projects_data])
+        type_event = st.selectbox("Type d'événement", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
+        description = st.text_area("Description courte")
         
-        c.executemany("""INSERT INTO users (name, role) VALUES (?,?)""", [
-            ("Antoine Grandjean", "Administrateur"),
-            ("Jean Installer", "Technicien"),
-            ("Marie C4", "Programmeur C4"),
-            ("Pierre Direction", "Direction"),
-        ])
-        
-        c.executemany("""INSERT INTO events (project_id, user_id, timestamp, event_type, description, est_resolu) VALUES (?,?,?,?,?,?)""", [
-            (1, 2, "2026-05-28 09:15", "Problème", "Câblage HDMI instable sur zone salon", 1),
-            (1, 3, "2026-05-28 14:30", "Blocage technique C4", "Problème pairing remote SR-260", 0),
-            (2, 2, "2026-05-30 11:45", "Étape terminée", "Découverte réseau C4 terminée", 1),
-            (3, 2, "2026-06-01 08:30", "Problème", "Écran signage ne s'allume pas", 0),
-        ])
-        conn.commit()
-    conn.close()
+        if st.form_submit_button("📤 Envoyer l'information"):
+            st.success(f"Information enregistrée sur le chantier : {chantier}")
+            st.balloons()
 
-init_db()
+elif page == "📅 Planning & Coordination":
+    st.subheader("Planning & Coordination d'équipe")
+    
+    st.write("**Affectations de la semaine**")
+    planning_data = [
+        {"Date": "03/06", "Personne": "Jean Installer", "Chantier": "Villa Uccle", "Notes": "Technicien principal"},
+        {"Date": "06/06", "Personne": "Marie C4", "Chantier": "Ixelles", "Notes": "Support technique C4"},
+        {"Date": "06/06", "Personne": "Antoine Grandjean", "Chantier": "Boutique HD", "Notes": "Administrateur - Samedi"},
+    ]
+    st.dataframe(pd.DataFrame(planning_data), use_container_width=True, hide_index=True)
+    
+    if role == "Administrateur":
+        st.success("Vous pouvez modifier le planning (fonctionnalité à développer).")
 
-st.title("HD Full Concept - Centralisation Projets (MVP)")
+elif page == "📈 Rapports":
+    st.subheader("Rapports & Débriefs")
+    st.info("Fonctionnalité de génération de rapports hebdomadaires (à développer).")
 
-role = st.sidebar.selectbox("Rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
-
-st.success(f"Connecté en tant que : {role}")
-
-conn = get_conn()
-projects = pd.read_sql("SELECT * FROM projects", conn)
-st.subheader("Chantiers")
-st.dataframe(projects, use_container_width=True, hide_index=True)
-
-st.subheader("Événements récents")
-events = pd.read_sql("""
-    SELECT e.timestamp, p.name as projet, e.event_type, e.description, e.est_resolu
-    FROM events e
-    JOIN projects p ON e.project_id = p.id
-    ORDER BY e.timestamp DESC
-""", conn)
-st.dataframe(events, use_container_width=True, hide_index=True)
-conn.close()
-
-st.info("Application MVP corrigée et simplifiée pour Streamlit Cloud. Tu peux maintenant tester les différentes vues selon le rôle.")
+# ====================== FOOTER ======================
+st.divider()
+st.caption("HD Full Concept SA — Prototype interne — Juin 2026")
