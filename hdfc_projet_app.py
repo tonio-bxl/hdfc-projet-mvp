@@ -14,7 +14,7 @@ supabase: Client = create_client(url, key)
 col1, col2 = st.columns([1, 5])
 
 with col1:
-    st.image("logo-HDFC.png", width=120)
+    st.image("logo-HDFC.png", width=200)
 
 with col2:
     st.markdown("""
