@@ -54,7 +54,12 @@ def add_event(project_id, event_type, description, photo_url=None):
         "est_resolu": False,
         "photo_url": photo_url
     }
-    supabase.table("events").insert(data).execute()
+    try:
+        supabase.table("events").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erreur : {str(e)}")
+        return False
 
 # ====================== PAGES ======================
 
@@ -101,27 +106,26 @@ elif page == "⚡ Encodage Rapide":
         projet_id = int(df[df["name"] == chantier]["id"].values[0])
         type_event = st.selectbox("Type", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
         description = st.text_area("Description")
-        photo = st.file_uploader("📸 Prendre ou uploader une photo", type=["jpg", "png", "jpeg"])
+        photo = st.file_uploader("📸 Photo (optionnel)", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("📤 Enregistrer"):
             photo_url = None
             if photo:
-                # Upload vers Supabase Storage
-                file_bytes = photo.getvalue()
-                file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.name}"
                 try:
-                    res = supabase.storage.from_("project-photos").upload(file_name, file_bytes)
+                    file_bytes = photo.getvalue()
+                    file_name = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.name}"
+                    res = supabase.storage.from_("project-photos").upload(file_name, file_bytes, {"content-type": photo.type})
                     photo_url = supabase.storage.from_("project-photos").get_public_url(file_name)
-                except:
-                    st.error("Erreur lors de l'upload de la photo")
+                except Exception as e:
+                    st.error(f"Erreur upload photo: {str(e)}")
             
-            add_event(projet_id, type_event, description, photo_url)
-            st.success("Événement + photo enregistrés !")
-            st.rerun()
+            if add_event(projet_id, type_event, description, photo_url):
+                st.success("✅ Événement + photo enregistrés avec succès !")
+                st.rerun()
 
 elif page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda")
-    st.info("Vue Timeline + Tâches (déjà implémentée précédemment)")
+    st.info("Vue Timeline et tâches (déjà disponible)")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
