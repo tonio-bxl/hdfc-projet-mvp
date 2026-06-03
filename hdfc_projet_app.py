@@ -24,7 +24,6 @@ with col2:
 
 st.divider()
 
-st.divider()
 
 # ====================== SIDEBAR ======================
 with st.sidebar:
