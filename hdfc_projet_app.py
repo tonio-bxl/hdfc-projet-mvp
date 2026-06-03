@@ -11,7 +11,7 @@ key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
 # ====================== HEADER ======================
-col1, col2 = st.columns([1, 5])
+col1, col2 = st.columns([1.2, 5])
 
 with col1:
     st.image("logo-HDFC.png", width=200)
@@ -19,11 +19,9 @@ with col1:
 with col2:
     st.markdown("""
         <h1 style="margin: 0; font-size: 26px;">Centralisation des Projets</h1>
-        <p style="margin: 0; color: #666; font-size: 16px;">Le Son, L'Image, Le Service</p>
     """, unsafe_allow_html=True)
 
 st.divider()
-
 
 # ====================== SIDEBAR ======================
 with st.sidebar:
