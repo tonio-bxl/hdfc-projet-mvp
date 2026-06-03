@@ -27,11 +27,23 @@ st.divider()
 
 # ====================== SIDEBAR ======================
 with st.sidebar:
+    # Logo dans la sidebar
+    st.image("logo-HDFC.png", width=160)
     st.header("HD Full Concept")
-    role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
+    
+    role = st.selectbox(
+        "Votre rôle",
+        ["Administrateur", "Technicien", "Programmeur C4", "Direction"]
+    )
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-    page = st.radio("Navigation", ["📊 Tableau de bord", "📁 Fiche Chantier", "⚡ Encodage Rapide", "📅 Planning"])
+    
+    page = st.radio("Navigation", [
+        "📊 Tableau de bord",
+        "📁 Fiche Chantier",
+        "⚡ Encodage Rapide",
+        "📅 Planning"
+    ])
 
 # ====================== FONCTIONS SUPABASE ======================
 def get_projects():
