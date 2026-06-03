@@ -58,7 +58,7 @@ def add_event(project_id, event_type, description, photo_url=None):
         supabase.table("events").insert(data).execute()
         return True
     except Exception as e:
-        st.error(f"Erreur : {str(e)}")
+        st.error(f"Erreur insertion : {str(e)}")
         return False
 
 # ====================== PAGES ======================
@@ -116,16 +116,17 @@ elif page == "⚡ Encodage Rapide":
                     file_name = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.name}"
                     res = supabase.storage.from_("project-photos").upload(file_name, file_bytes, {"content-type": photo.type})
                     photo_url = supabase.storage.from_("project-photos").get_public_url(file_name)
+                    st.success("Photo uploadée avec succès")
                 except Exception as e:
                     st.error(f"Erreur upload photo: {str(e)}")
             
             if add_event(projet_id, type_event, description, photo_url):
-                st.success("✅ Événement + photo enregistrés avec succès !")
+                st.success("✅ Événement enregistré avec succès !")
                 st.rerun()
 
 elif page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda")
-    st.info("Vue Timeline et tâches (déjà disponible)")
+    st.info("Vue Timeline et tâches disponible")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
