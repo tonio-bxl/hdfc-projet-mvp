@@ -117,4 +117,9 @@ elif page == "📅 Planning & Agenda":
             {"Date": "06/06/2026", "Projet": "Boutique HD", "Activité": "Présence samedi (min. 2 pers.)", "Personne": "Antoine + Marie"},
             {"Date": "10/06/2026", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne": "Marie C4"},
             {"Date": "15/06/2026", "Projet": "Waterloo", "Activité": "RDV client salles cinéma", "Personne": "Sophie"},
-            {"Date": "20/06/2026", "Projet": "La Hulpe", "Activité": "
+            {"Date": "20/06/2026", "Projet": "La Hulpe", "Activité": "Tests Home Cinéma", "Personne": "Jean Installer"},
+        ]
+        st.dataframe(pd.DataFrame(agenda_data), use_container_width=True, hide_index=True)
+
+st.divider()
+st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
