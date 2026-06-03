@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+import plotly.express as px
+from datetime import datetime
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -36,30 +38,11 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
-def get_events(project_id=None):
-    query = supabase.table("events").select("*, projects(name)")
-    if project_id:
-        query = query.eq("project_id", project_id)
-    response = query.order("timestamp", desc=True).execute()
-    return response.data
-
-def add_event(project_id, event_type, description, photo_b64=None):
-    data = {
-        "project_id": project_id,
-        "user_id": 1,
-        "event_type": event_type,
-        "description": description,
-        "est_resolu": False
-    }
-    supabase.table("events").insert(data).execute()
-
 # ====================== PAGES ======================
 
 if page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
-    
-    # Affichage avec barres de progression
     for _, proj in df.iterrows():
         col1, col2, col3 = st.columns([4, 2, 1])
         with col1:
@@ -83,11 +66,6 @@ elif page == "📁 Fiche Chantier":
     with col2:
         st.metric("Statut", projet["statut"])
         st.progress(float(projet["progress_pct"]) / 100, text=f"Avancement : {projet['progress_pct']}%")
-    
-    st.subheader("Événements")
-    events = get_events(projet["id"])
-    for ev in events:
-        st.write(f"**{ev['event_type']}** — {ev['description']}")
 
 elif page == "⚡ Encodage Rapide":
     st.subheader("⚡ Encodage Rapide sur Chantier")
@@ -97,24 +75,50 @@ elif page == "⚡ Encodage Rapide":
         projet_id = int(df[df["name"] == chantier]["id"].values[0])
         type_event = st.selectbox("Type", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
         description = st.text_area("Description")
-        photo = st.file_uploader("Photo (optionnel)", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("📤 Enregistrer"):
-            add_event(projet_id, type_event, description)
-            st.success("Événement enregistré avec succès !")
+            supabase.table("events").insert({
+                "project_id": projet_id,
+                "user_id": 1,
+                "event_type": type_event,
+                "description": description
+            }).execute()
+            st.success("Événement enregistré !")
             st.rerun()
 
 elif page == "📅 Planning & Coordination":
-    st.subheader("📅 Planning & Coordination")
+    st.subheader("📅 Planning & Coordination - Vue Gantt")
     
-    # Vue Gantt simplifiée
-    st.write("**Vue Gantt simplifiée des chantiers**")
     df = get_projects()
+    
+    # Préparation des données pour Gantt
+    gantt_data = []
     for _, p in df.iterrows():
-        st.write(f"**{p['name']}**")
-        st.progress(float(p['progress_pct']) / 100, text=f"{p['statut']} — {p['progress_pct']}%")
-        st.caption("Équipe assignée : À implémenter")
-        st.divider()
+        gantt_data.append({
+            "Task": p["name"][:35] + "..." if len(p["name"]) > 35 else p["name"],
+            "Start": "2026-06-01",
+            "Finish": "2026-08-15",
+            "Progress": p["progress_pct"],
+            "Status": p["statut"]
+        })
+    
+    gantt_df = pd.DataFrame(gantt_data)
+    
+    fig = px.timeline(
+        gantt_df,
+        x_start="Start",
+        x_end="Finish",
+        y="Task",
+        color="Status",
+        title="Vue Gantt des Projets HD Full Concept",
+        labels={"Task": "Projet"}
+    )
+    
+    fig.update_layout(height=600, showlegend=True)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.subheader("Liste détaillée")
+    st.dataframe(df[["name", "client_name", "type_projet", "statut", "progress_pct"]], use_container_width=True, hide_index=True)
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
