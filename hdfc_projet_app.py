@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -30,7 +30,7 @@ with st.sidebar:
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
         "⚡ Encodage Rapide",
-        "📅 Planning & Coordination"
+        "📅 Planning & Agenda"
     ])
 
 # ====================== FONCTIONS ======================
@@ -65,28 +65,63 @@ elif page == "📁 Fiche Chantier":
         st.metric("Type", projet["type_projet"])
     with col2:
         st.metric("Statut", projet["statut"])
-        st.progress(float(projet["progress_pct"]) / 100, text=f"Avancement : {projet['progress_pct']}%")
+        st.progress(float(projet["progress_pct"]) / 100)
 
 elif page == "⚡ Encodage Rapide":
-    st.subheader("⚡ Encodage Rapide sur Chantier")
+    st.subheader("⚡ Encodage Rapide")
     df = get_projects()
     with st.form("encode_form"):
         chantier = st.selectbox("Chantier", df["name"].tolist())
         projet_id = int(df[df["name"] == chantier]["id"].values[0])
         type_event = st.selectbox("Type", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
         description = st.text_area("Description")
-        
-        if st.form_submit_button("📤 Enregistrer"):
+        if st.form_submit_button("Enregistrer"):
             supabase.table("events").insert({
-                "project_id": projet_id,
-                "user_id": 1,
-                "event_type": type_event,
-                "description": description
+                "project_id": projet_id, "user_id": 1, "event_type": type_event, "description": description
             }).execute()
-            st.success("Événement enregistré !")
+            st.success("Enregistré !")
             st.rerun()
 
-elif page == "📅 Planning & Coordination":
+elif page == "📅 Planning & Agenda":
+    st.subheader("📅 Planning & Agenda")
+    
+    # Sélecteur de période
+    col1, col2 = st.columns(2)
+    with col1:
+        view_mode = st.radio("Vue", ["Agenda Mensuel", "Gantt"], horizontal=True)
+    with col2:
+        current_month = st.date_input("Mois", datetime(2026, 6, 1), label_visibility="collapsed")
+    
+    if view_mode == "Gantt":
+        df = get_projects()
+        gantt_data = []
+        for _, p in df.iterrows():
+            gantt_data.append({
+                "Task": p["name"][:40],
+                "Start": "2026-06-01",
+                "Finish": "2026-09-15",
+                "Progress": p["progress_pct"],
+                "Status": p["statut"]
+            })
+        fig = px.timeline(pd.DataFrame(gantt_data), x_start="Start", x_end="Finish", y="Task", color="Status")
+        fig.update_layout(height=650)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    else:  # Agenda Mensuel
+        st.write(f"**Agenda - {current_month.strftime('%B %Y')}**")
+        st.info("Vue agenda mensuel simplifiée (à développer davantage avec vraies dates d'assignation).")
+        
+        # Simulation d'agenda
+        agenda_data = [
+            {"Date": "2026-06-03", "Projet": "Villa Uccle", "Activité": "Installation acoustique", "Personne": "Jean Installer"},
+            {"Date": "2026-06-06", "Projet": "Boutique HD", "Activité": "Présence samedi (2 pers.)", "Personne": "Antoine + Marie"},
+            {"Date": "2026-06-10", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne": "Marie C4"},
+            {"Date": "2026-06-15", "Projet": "Waterloo", "Activité": "RDV commercial", "Personne": "Sophie"},
+        ]
+        st.dataframe(pd.DataFrame(agenda_data), use_container_width=True, hide_index=True)
+
+st.divider()
+st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")elif page == "📅 Planning & Coordination":
     st.subheader("📅 Planning & Coordination - Vue Gantt")
     
     df = get_projects()
