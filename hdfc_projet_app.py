@@ -38,6 +38,13 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
+def get_tasks(project_id=None):
+    query = supabase.table("tasks").select("*, projects(name)")
+    if project_id:
+        query = query.eq("project_id", project_id)
+    response = query.order("start_date").execute()
+    return pd.DataFrame(response.data)
+
 # ====================== PAGES ======================
 
 if page == "📊 Tableau de bord":
@@ -65,7 +72,15 @@ elif page == "📁 Fiche Chantier":
         st.metric("Type", projet["type_projet"])
     with col2:
         st.metric("Statut", projet["statut"])
-        st.progress(float(projet["progress_pct"]) / 100, text=f"Avancement : {projet['progress_pct']}%")
+        st.progress(float(projet["progress_pct"]) / 100)
+    
+    st.subheader("Tâches du projet")
+    tasks = get_tasks(projet["id"])
+    if not tasks.empty:
+        st.dataframe(tasks[["name", "description", "statut", "progress_pct", "start_date", "end_date", "assigned_to", "external_intervenant"]], 
+                    use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucune tâche définie pour ce projet.")
 
 elif page == "⚡ Encodage Rapide":
     st.subheader("⚡ Encodage Rapide sur Chantier")
@@ -77,49 +92,42 @@ elif page == "⚡ Encodage Rapide":
         description = st.text_area("Description")
         if st.form_submit_button("📤 Enregistrer"):
             supabase.table("events").insert({
-                "project_id": projet_id,
-                "user_id": 1,
-                "event_type": type_event,
-                "description": description
+                "project_id": projet_id, "user_id": 1, "event_type": type_event, "description": description
             }).execute()
             st.success("Événement enregistré !")
             st.rerun()
 
 elif page == "📅 Planning & Agenda":
-    st.subheader("📅 Planning & Agenda")
+    st.subheader("📅 Planning & Agenda - Timeline & Dépendances")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        view_mode = st.radio("Type de vue", ["Agenda Mensuel", "Gantt"], horizontal=True)
-    with col2:
-        current_month = st.date_input("Mois à afficher", datetime(2026, 6, 1))
+    df = get_projects()
+    view_mode = st.radio("Type de vue", ["Timeline Globale", "Tâches Détaillées"], horizontal=True)
     
-    if view_mode == "Gantt":
-        df = get_projects()
+    if view_mode == "Timeline Globale":
+        st.write("**Timeline Globale des Projets**")
         gantt_data = []
         for _, p in df.iterrows():
             gantt_data.append({
-                "Task": p["name"][:35],
+                "Task": p["name"][:40],
                 "Start": "2026-06-01",
                 "Finish": "2026-09-15",
                 "Progress": p["progress_pct"],
                 "Status": p["statut"]
             })
-        fig = px.timeline(pd.DataFrame(gantt_data), x_start="Start", x_end="Finish", y="Task", color="Status", title="Vue Gantt Globale")
-        fig.update_layout(height=650)
+        fig = px.timeline(pd.DataFrame(gantt_data), x_start="Start", x_end="Finish", y="Task", color="Status", title="Vue Gantt des Projets")
+        fig.update_layout(height=700)
         st.plotly_chart(fig, use_container_width=True)
     
-    else:  # Agenda Mensuel
-        st.write(f"**Agenda du mois de {current_month.strftime('%B %Y')}**")
-        
-        agenda_data = [
-            {"Date": "03/06/2026", "Projet": "Villa Uccle", "Activité": "Installation acoustique", "Personne": "Jean Installer"},
-            {"Date": "06/06/2026", "Projet": "Boutique HD", "Activité": "Présence samedi (min. 2 pers.)", "Personne": "Antoine + Marie"},
-            {"Date": "10/06/2026", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne": "Marie C4"},
-            {"Date": "15/06/2026", "Projet": "Waterloo", "Activité": "RDV client salles cinéma", "Personne": "Sophie"},
-            {"Date": "20/06/2026", "Projet": "La Hulpe", "Activité": "Tests Home Cinéma", "Personne": "Jean Installer"},
-        ]
-        st.dataframe(pd.DataFrame(agenda_data), use_container_width=True, hide_index=True)
+    else:  # Tâches Détaillées
+        st.write("**Tâches par projet (avec dépendances & intervenants externes)**")
+        for _, proj in df.iterrows():
+            with st.expander(f"{proj['name']} — {proj['client_name']} ({proj['progress_pct']}%)"):
+                tasks = get_tasks(proj["id"])
+                if not tasks.empty:
+                    st.dataframe(tasks[["name", "description", "statut", "progress_pct", "start_date", "end_date", "assigned_to", "external_intervenant"]], 
+                               use_container_width=True, hide_index=True)
+                else:
+                    st.info("Aucune tâche pour ce projet.")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
