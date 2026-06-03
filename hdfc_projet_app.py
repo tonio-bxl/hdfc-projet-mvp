@@ -111,79 +111,10 @@ elif page == "📅 Planning & Agenda":
     
     else:  # Agenda Mensuel
         st.write(f"**Agenda du mois de {current_month.strftime('%B %Y')}**")
-        st.info("Vue style Google Agenda (simulation pour le moment)")
         
         agenda_data = [
             {"Date": "03/06/2026", "Projet": "Villa Uccle", "Activité": "Installation acoustique", "Personne": "Jean Installer"},
             {"Date": "06/06/2026", "Projet": "Boutique HD", "Activité": "Présence samedi (min. 2 pers.)", "Personne": "Antoine + Marie"},
-            {"Date": "10/06/2026", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne    col1, col2 = st.columns(2)
-    with col1:
-        view_mode = st.radio("Vue", ["Agenda Mensuel", "Gantt"], horizontal=True)
-    with col2:
-        current_month = st.date_input("Mois", datetime(2026, 6, 1), label_visibility="collapsed")
-    
-    if view_mode == "Gantt":
-        df = get_projects()
-        gantt_data = []
-        for _, p in df.iterrows():
-            gantt_data.append({
-                "Task": p["name"][:40],
-                "Start": "2026-06-01",
-                "Finish": "2026-09-15",
-                "Progress": p["progress_pct"],
-                "Status": p["statut"]
-            })
-        fig = px.timeline(pd.DataFrame(gantt_data), x_start="Start", x_end="Finish", y="Task", color="Status")
-        fig.update_layout(height=650)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    else:  # Agenda Mensuel
-        st.write(f"**Agenda - {current_month.strftime('%B %Y')}**")
-        st.info("Vue agenda mensuel simplifiée (à développer davantage avec vraies dates d'assignation).")
-        
-        # Simulation d'agenda
-        agenda_data = [
-            {"Date": "2026-06-03", "Projet": "Villa Uccle", "Activité": "Installation acoustique", "Personne": "Jean Installer"},
-            {"Date": "2026-06-06", "Projet": "Boutique HD", "Activité": "Présence samedi (2 pers.)", "Personne": "Antoine + Marie"},
-            {"Date": "2026-06-10", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne": "Marie C4"},
-            {"Date": "2026-06-15", "Projet": "Waterloo", "Activité": "RDV commercial", "Personne": "Sophie"},
-        ]
-        st.dataframe(pd.DataFrame(agenda_data), use_container_width=True, hide_index=True)
-
-st.divider()
-st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")elif page == "📅 Planning & Coordination":
-    st.subheader("📅 Planning & Coordination - Vue Gantt")
-    
-    df = get_projects()
-    
-    # Préparation des données pour Gantt
-    gantt_data = []
-    for _, p in df.iterrows():
-        gantt_data.append({
-            "Task": p["name"][:35] + "..." if len(p["name"]) > 35 else p["name"],
-            "Start": "2026-06-01",
-            "Finish": "2026-08-15",
-            "Progress": p["progress_pct"],
-            "Status": p["statut"]
-        })
-    
-    gantt_df = pd.DataFrame(gantt_data)
-    
-    fig = px.timeline(
-        gantt_df,
-        x_start="Start",
-        x_end="Finish",
-        y="Task",
-        color="Status",
-        title="Vue Gantt des Projets HD Full Concept",
-        labels={"Task": "Projet"}
-    )
-    
-    fig.update_layout(height=600, showlegend=True)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.subheader("Liste détaillée")
-    st.dataframe(df[["name", "client_name", "type_projet", "statut", "progress_pct"]], use_container_width=True, hide_index=True)
-
-st.divider()
-st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
+            {"Date": "10/06/2026", "Projet": "Ixelles", "Activité": "Programmation C4", "Personne": "Marie C4"},
+            {"Date": "15/06/2026", "Projet": "Waterloo", "Activité": "RDV client salles cinéma", "Personne": "Sophie"},
+            {"Date": "20/06/2026", "Projet": "La Hulpe", "Activité": "
