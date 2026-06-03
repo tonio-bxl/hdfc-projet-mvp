@@ -1,8 +1,14 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from supabase import create_client, Client
+from datetime import datetime
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
+
+# ====================== CONNEXION SUPABASE ======================
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase: Client = create_client(url, key)
 
 # ====================== HEADER ======================
 st.markdown("""
@@ -22,104 +28,86 @@ st.divider()
 # ====================== SIDEBAR ======================
 with st.sidebar:
     st.header("HD Full Concept")
-    
-    role = st.selectbox(
-        "Votre rôle",
-        ["Administrateur", "Technicien", "Programmeur C4", "Direction"],
-        index=0
-    )
-    
+    role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-    
-    page = st.radio("Navigation", [
-        "📊 Tableau de bord",
-        "📁 Fiche Chantier",
-        "⚡ Encodage Rapide",
-        "📅 Planning & Coordination",
-        "📈 Rapports"
-    ])
+    page = st.radio("Navigation", ["📊 Tableau de bord", "📁 Fiche Chantier", "⚡ Encodage Rapide", "📅 Planning"])
 
-# ====================== DONNÉES ======================
-projects_data = [
-    {"id": 1, "name": "Villa Uccle - Home Cinéma Premium", "client": "M. & Mme. Lambert", "type": "Home Cinéma Control4", "statut": "En cours", "progress": 72, "is_c4": True},
-    {"id": 2, "name": "Appartement Ixelles - Domotique Full C4", "client": "Famille Dubois", "type": "Domotique C4", "statut": "En cours", "progress": 45, "is_c4": True},
-    {"id": 3, "name": "Boutique HD - Signage & Visio", "client": "HD Full Concept", "type": "Signage professionnel", "statut": "En cours", "progress": 88, "is_c4": False},
-    {"id": 4, "name": "Résidence Waterloo - Salles Cinéma", "client": "M. Van der Berg", "type": "Salles de cinéma privées", "statut": "En préparation", "progress": 15, "is_c4": True},
-]
+# ====================== FONCTIONS SUPABASE ======================
+def get_projects():
+    response = supabase.table("projects").select("*").execute()
+    return response.data
 
-events_data = [
-    {"projet": "Villa Uccle", "type": "Problème", "desc": "Câblage HDMI instable", "date": "28/05", "resolu": True},
-    {"projet": "Villa Uccle", "type": "Blocage C4", "desc": "Pairing remote SR-260", "date": "28/05", "resolu": False},
-    {"projet": "Ixelles", "type": "Étape terminée", "desc": "Découverte réseau C4", "date": "30/05", "resolu": True},
-]
+def get_events(project_id=None):
+    query = supabase.table("events").select("*, projects(name)")
+    if project_id:
+        query = query.eq("project_id", project_id)
+    response = query.order("timestamp", desc=True).execute()
+    return response.data
+
+def add_event(project_id, event_type, description):
+    data = {
+        "project_id": project_id,
+        "user_id": 1,  # À améliorer plus tard avec un vrai système d'utilisateur
+        "event_type": event_type,
+        "description": description,
+        "est_resolu": False
+    }
+    supabase.table("events").insert(data).execute()
 
 # ====================== PAGES ======================
 
 if page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
-    
-    df = pd.DataFrame(projects_data)
-    st.dataframe(df[["name", "client", "type", "statut", "progress"]], use_container_width=True, hide_index=True)
-    
-    if role == "Administrateur":
-        st.success("En tant qu'Administrateur, vous avez une vue complète sur tous les chantiers.")
-    elif role == "Technicien":
-        st.info("Vous ne voyez ici que les chantiers qui vous sont assignés (simulation).")
+    projects = get_projects()
+    if projects:
+        df = pd.DataFrame(projects)
+        st.dataframe(df[["name", "client_name", "type_projet", "statut", "progress_pct"]], use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucun projet pour le moment.")
 
 elif page == "📁 Fiche Chantier":
-    st.subheader("Fiche Chantier détaillée")
-    
-    selected = st.selectbox("Choisir un chantier", [p["name"] for p in projects_data])
-    projet = next(p for p in projects_data if p["name"] == selected)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Client", projet["client"])
-        st.metric("Type", projet["type"])
-    with col2:
-        st.metric("Statut", projet["statut"])
-        st.progress(projet["progress"] / 100, text=f"Avancement : {projet['progress']}%")
-    
-    st.markdown("### Événements du chantier")
-    for ev in events_data:
-        if ev["projet"] in selected:
-            color = "🟢" if ev["resolu"] else "🔴"
-            st.write(f"{color} **{ev['date']}** - {ev['type']} : {ev['desc']}")
-    
-    if role in ["Administrateur", "Programmeur C4"]:
-        st.text_area("Ajouter une note / mise à jour technique")
+    st.subheader("Fiche Chantier")
+    projects = get_projects()
+    if projects:
+        selected = st.selectbox("Choisir un chantier", [p["name"] for p in projects])
+        projet = next(p for p in projects if p["name"] == selected)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Client", projet.get("client_name", "-"))
+            st.metric("Type", projet.get("type_projet", "-"))
+        with col2:
+            st.metric("Statut", projet.get("statut", "-"))
+            st.progress(float(projet.get("progress_pct", 0)) / 100)
+        
+        st.markdown("### Événements")
+        events = get_events(projet["id"])
+        for ev in events:
+            st.write(f"**{ev['event_type']}** - {ev['description']}")
+    else:
+        st.warning("Aucun chantier disponible.")
 
 elif page == "⚡ Encodage Rapide":
-    st.subheader("⚡ Encodage Rapide (mobile friendly)")
-    
-    with st.form("encode_form"):
-        chantier = st.selectbox("Chantier", [p["name"] for p in projects_data])
-        type_event = st.selectbox("Type d'événement", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
-        description = st.text_area("Description courte")
-        
-        if st.form_submit_button("📤 Envoyer l'information"):
-            st.success(f"Information enregistrée sur le chantier : {chantier}")
-            st.balloons()
+    st.subheader("Encodage Rapide")
+    projects = get_projects()
+    if projects:
+        with st.form("encode"):
+            chantier = st.selectbox("Chantier", [p["name"] for p in projects])
+            projet_id = next(p["id"] for p in projects if p["name"] == chantier)
+            type_event = st.selectbox("Type", ["Problème", "Réussite", "Étape terminée", "Blocage technique C4"])
+            desc = st.text_area("Description")
+            
+            if st.form_submit_button("Envoyer"):
+                add_event(projet_id, type_event, desc)
+                st.success("Information enregistrée dans Supabase !")
+                st.rerun()
+    else:
+        st.info("Aucun chantier disponible.")
 
-elif page == "📅 Planning & Coordination":
-    st.subheader("Planning & Coordination d'équipe")
-    
-    st.write("**Affectations de la semaine**")
-    planning_data = [
-        {"Date": "03/06", "Personne": "Jean Installer", "Chantier": "Villa Uccle", "Notes": "Technicien principal"},
-        {"Date": "06/06", "Personne": "Marie C4", "Chantier": "Ixelles", "Notes": "Support technique C4"},
-        {"Date": "06/06", "Personne": "Antoine Grandjean", "Chantier": "Boutique HD", "Notes": "Administrateur - Samedi"},
-    ]
-    st.dataframe(pd.DataFrame(planning_data), use_container_width=True, hide_index=True)
-    
-    if role == "Administrateur":
-        st.success("Vous pouvez modifier le planning (fonctionnalité à développer).")
+elif page == "📅 Planning":
+    st.subheader("Planning & Coordination")
+    st.info("Vue Planning + Gantt à développer dans la prochaine version.")
 
-elif page == "📈 Rapports":
-    st.subheader("Rapports & Débriefs")
-    st.info("Fonctionnalité de génération de rapports hebdomadaires (à développer).")
-
-# ====================== FOOTER ======================
 st.divider()
-st.caption("HD Full Concept SA — Prototype interne — Juin 2026")
+st.caption("HD Full Concept SA — Prototype connecté à Supabase")
