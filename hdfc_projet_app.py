@@ -72,20 +72,11 @@ def get_projects():
 def create_project(data):
     supabase.table("projects").insert(data).execute()
 
-def get_tasks(project_id):
-    response = supabase.table("tasks").select("*").eq("project_id", project_id).execute()
-    return pd.DataFrame(response.data)
-
-def add_task(project_id, task_data):
-    data = {"project_id": project_id, **task_data}
-    supabase.table("tasks").insert(data).execute()
-
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [x] Gantt avec projets urgents en haut
-        - [ ] Ajouter les tâches dans la fiche chantier
-        - [ ] Afficher événements + photos dans la fiche
+        - [x] Gantt corrigé (urgents en haut)
+        - [ ] Améliorations fiche chantier
         - [ ] Upload photos et documents
         - [ ] Gestion fine des rôles
         - [ ] Export PDF fiche chantier
@@ -140,13 +131,11 @@ if st.session_state.current_page == "📊 Tableau de bord":
                 st.session_state.current_page = "📁 Fiche Chantier"
                 st.rerun()
         with col2:
-            st.progress(float(proj['progress_pct']) / 100, text=f"{proj['progress_pct']}%")
+            st.progress(float(proj.get('progress_pct', 0)) / 100, text=f"{proj.get('progress_pct', 0)}%")
         with col3:
-            debut = proj.get('date_debut', 'N/A')
-            st.caption(f"▶️ {debut}")
+            st.caption(f"▶️ {proj.get('date_debut', 'N/A')}")
         with col4:
-            echeance = proj.get('date_fin_estimee', 'N/A')
-            st.caption(f"📅 {echeance}")
+            st.caption(f"📅 {proj.get('date_fin_estimee', 'N/A')}")
         with col5:
             st.caption(proj['statut'])
         st.divider()
@@ -154,12 +143,14 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (améliorée avec tâches)
+# PAGE : FICHE CHANTIER (améliorée comme demandé)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
+    # Police plus petite
     st.markdown("""
         <style>
-        .stMarkdown, .stMetric, .stSelectbox, .stButton { font-size: 14px !important; }
+        .stMarkdown, .stMetric, .stSelectbox, .stButton, .stTextInput { font-size: 14px !important; }
+        h1, h2, h3 { font-size: 18px !important; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -172,11 +163,17 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         current_name = list(project_options.keys())[0]
         st.session_state.current_project_id = project_options[current_name]
     
-    selected_name = st.selectbox(
-        "Changer de chantier",
-        options=list(project_options.keys()),
-        index=list(project_options.keys()).index(current_name)
-    )
+    # Ligne supérieure : Dropdown étroit + % avancement
+    col_select, col_progress = st.columns([3, 1])
+    with col_select:
+        selected_name = st.selectbox(
+            "Changer de chantier",
+            options=list(project_options.keys()),
+            index=list(project_options.keys()).index(current_name)
+        )
+    with col_progress:
+        projet_temp = df[df['id'] == project_options[selected_name]].iloc[0]
+        st.metric("Avancement", f"{projet_temp.get('progress_pct', 0)}%")
     
     if project_options[selected_name] != st.session_state.current_project_id:
         st.session_state.current_project_id = project_options[selected_name]
@@ -185,48 +182,21 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
     
     st.subheader(projet["name"])
-    col1, col2, col3 = st.columns(3)
+    
+    # Infos compactes
+    col1, col2, col3, col4 = st.columns([2, 1.5, 1.5, 1.5])
     with col1:
-        st.metric("Client", projet["client_name"])
-        st.metric("Type", projet["type_projet"])
+        st.metric("Client", projet.get("client_name", "—"))
+        st.metric("Type", projet.get("type_projet", "—"))
     with col2:
-        st.metric("Statut", projet["statut"])
-        st.progress(float(projet.get("progress_pct", 0)) / 100, text=f"{projet.get('progress_pct', 0)}%")
+        st.metric("Statut", projet.get("statut", "—"))
     with col3:
-        echeance = projet.get('date_fin_estimee', 'Non définie')
-        st.metric("📅 Date d'échéance", echeance)
+        st.metric("Début", projet.get('date_debut', 'Non défini'))
+    with col4:
+        st.metric("Échéance", projet.get('date_fin_estimee', 'Non défini'))
     
     st.divider()
-    
-    # === SECTION TÂCHES ===
-    st.subheader("📋 Tâches du chantier")
-    tasks_df = get_tasks(st.session_state.current_project_id)
-    
-    if not tasks_df.empty:
-        st.dataframe(tasks_df[["task_name", "status", "assigned_to", "due_date"]], use_container_width=True)
-    else:
-        st.info("Aucune tâche pour le moment.")
-    
-    # Ajout rapide de tâche
-    with st.expander("➕ Ajouter une tâche", expanded=False):
-        with st.form("add_task_form"):
-            task_name = st.text_input("Nom de la tâche")
-            task_status = st.selectbox("Statut", ["À faire", "En cours", "Terminé"])
-            assigned_to = st.text_input("Assigné à (ex: Installateur 3)")
-            due_date = st.date_input("Date limite", value=date.today())
-            submitted_task = st.form_submit_button("Ajouter la tâche")
-            
-            if submitted_task and task_name:
-                add_task(st.session_state.current_project_id, {
-                    "task_name": task_name,
-                    "status": task_status,
-                    "assigned_to": assigned_to,
-                    "due_date": str(due_date)
-                })
-                st.success("Tâche ajoutée !")
-                st.rerun()
-    
-    st.divider()
+    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
     show_todo_list()
 
 # ============================================================
@@ -324,7 +294,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# AUTRES PAGES (simplifiées pour l'instant)
+# AUTRES PAGES
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
