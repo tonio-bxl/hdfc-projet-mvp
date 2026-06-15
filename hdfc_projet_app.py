@@ -239,7 +239,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt - Correction renforcée pour avoir "En cours" en haut
+        # Vue Gantt - Correction renforcée
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -255,7 +255,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             
-            # Tri très explicite par priorité
+            # Tri par priorité (En cours = priorité maximale)
             priority_map = {
                 "En cours": 0,
                 "En préparation": 1,
@@ -268,8 +268,8 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             gantt_df['priority'] = gantt_df['Status'].map(priority_map)
             gantt_df = gantt_df.sort_values(by=['priority', 'Start'])
             
-            status_order = ["En cours", "En préparation", "Devis signé / Commande confirmée", 
-                           "Devis envoyé", "Offre à faire", "En pause", "Terminé"]
+            # Force l'ordre des tâches dans l'axe Y
+            task_order = gantt_df["Task"].tolist()
             
             fig = px.timeline(
                 gantt_df,
@@ -280,12 +280,10 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"],
                 color_discrete_map=status_colors,
-                category_orders={"Status": status_order}
+                category_orders={"Status": ["En cours", "En préparation", "Devis signé / Commande confirmée", "Devis envoyé", "Offre à faire", "En pause", "Terminé"]}
             )
             
-            # Force l'ordre des tâches selon le DataFrame trié
-            fig.update_yaxes(categoryorder="array", categoryarray=gantt_df["Task"].tolist())
-            
+            fig.update_yaxes(categoryorder="array", categoryarray=task_order)
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
