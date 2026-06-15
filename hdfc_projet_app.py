@@ -4,12 +4,10 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
-# Connexion Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# Session state
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "📊 Tableau de bord"
 if 'current_project_id' not in st.session_state:
@@ -39,6 +37,9 @@ with st.sidebar:
         "📋 Bibliothèque Tâches"
     ]
     
+    if role == "Administrateur":
+        pages.append("➕ Créer un chantier")
+
     try:
         current_index = pages.index(st.session_state.current_page)
     except:
@@ -71,7 +72,6 @@ if st.session_state.current_page == "📊 Tableau de bord":
         with col2:
             st.progress(float(proj['progress_pct']) / 100, text=f"{proj['progress_pct']}%")
         with col3:
-            # Date d'échéance
             echeance = proj.get('date_fin_estimee', 'N/A')
             st.caption(f"📅 {echeance}")
         with col4:
@@ -79,12 +79,24 @@ if st.session_state.current_page == "📊 Tableau de bord":
         st.divider()
 
 elif st.session_state.current_page == "📁 Fiche Chantier":
+    
+    # === Style police plus petite ===
+    st.markdown("""
+        <style>
+        .stMarkdown, .stMetric, .stSelectbox, .stButton, .stSuccess, .stInfo {
+            font-size: 14px !important;
+        }
+        h1, h2, h3 {
+            font-size: 18px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     df = get_projects()
     
-    # === NOUVELLE LISTE DÉROULANTE POUR CHANGER DE CHANTIER ===
+    # Liste déroulante pour changer de chantier
     project_options = {row['name']: row['id'] for _, row in df.iterrows()}
     
-    # Sélection du projet actuel
     if st.session_state.current_project_id:
         current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
     else:
@@ -97,7 +109,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         index=list(project_options.keys()).index(current_name)
     )
     
-    # Si l'utilisateur change de projet dans la liste déroulante
     if project_options[selected_name] != st.session_state.current_project_id:
         st.session_state.current_project_id = project_options[selected_name]
         st.rerun()
@@ -118,7 +129,14 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.metric("📅 Date d'échéance", echeance)
     
     st.divider()
-    st.success("Fiche chantier affichée")
+    st.info("Ici on affichera bientôt les tâches, événements, photos et notes du chantier.")
+
+elif st.session_state.current_page == "➕ Créer un chantier":
+    if role != "Administrateur":
+        st.error("Seul l'Administrateur peut créer un nouveau chantier.")
+    else:
+        st.subheader("➕ Créer un nouveau chantier")
+        st.info("Formulaire de création à venir dans la prochaine itération.")
 
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
