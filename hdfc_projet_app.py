@@ -168,7 +168,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         }
         calendar(events=events, options=calendar_options)
     
-    else:
+       else:
         # === VUE TIMELINE / GANTT (3 et 6 mois) ===
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
@@ -183,14 +183,28 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 })
         
         if gantt_data:
+            gantt_df = pd.DataFrame(gantt_data)
+            
+            # Ordre inversé des statuts (Offre à faire en haut)
+            status_order = [
+                "Offre à faire",
+                "Devis envoyé",
+                "Devis signé / Commande confirmée",
+                "En préparation",
+                "En cours",
+                "En pause",
+                "Terminé"
+            ]
+            
             fig = px.timeline(
-                pd.DataFrame(gantt_data),
+                gantt_df,
                 x_start="Start",
                 x_end="Finish",
                 y="Task",
                 color="Status",
                 title=f"Vue Gantt - {periode}",
-                hover_data=["Progress"]
+                hover_data=["Progress"],
+                category_orders={"Status": status_order}   # ← Ordre personnalisé
             )
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
