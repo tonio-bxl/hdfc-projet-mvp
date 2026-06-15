@@ -9,7 +9,9 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# Session state
+# ====================== SESSION STATE ======================
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "📊 Tableau de bord"
 if 'current_project_id' not in st.session_state:
     st.session_state.current_project_id = None
 
@@ -28,13 +30,28 @@ with st.sidebar:
     role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-    page = st.radio("Navigation", [
+
+    # Navigation contrôlée par session_state
+    pages = [
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
         "⚡ Encodage Rapide",
         "📅 Planning & Agenda",
         "📋 Bibliothèque Tâches"
-    ])
+    ]
+    
+    # On force l'index selon la valeur actuelle de current_page
+    try:
+        current_index = pages.index(st.session_state.current_page)
+    except:
+        current_index = 0
+
+    page = st.radio("Navigation", pages, index=current_index)
+
+    # Si l'utilisateur change manuellement dans la sidebar
+    if page != st.session_state.current_page:
+        st.session_state.current_page = page
+        st.rerun()
 
 # ====================== FONCTIONS ======================
 def get_projects():
@@ -43,7 +60,7 @@ def get_projects():
 
 # ====================== PAGES ======================
 
-if page == "📊 Tableau de bord":
+if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
     
@@ -60,7 +77,7 @@ if page == "📊 Tableau de bord":
             st.caption(proj['statut'])
         st.divider()
 
-elif page == "📁 Fiche Chantier" or st.session_state.get('current_page') == "📁 Fiche Chantier":
+elif st.session_state.current_page == "📁 Fiche Chantier":
     if st.session_state.current_project_id is None:
         st.warning("Aucun chantier sélectionné. Retournez au Tableau de bord.")
     else:
@@ -76,12 +93,11 @@ elif page == "📁 Fiche Chantier" or st.session_state.get('current_page') == "�
             st.metric("Statut", projet["statut"])
             st.progress(float(projet["progress_pct"]) / 100, text=f"Avancement : {projet['progress_pct']}%")
         
-        st.success("Fiche du chantier chargée")
-        st.info("Ici on mettra bientôt les tâches, événements et photos.")
+        st.success("✅ Fiche chantier affichée")
+        st.info("On ajoutera bientôt les tâches, événements et photos ici.")
 
-# Autres pages temporaires
 else:
-    st.info(f"Page **{page}** en cours de développement.")
+    st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
