@@ -239,7 +239,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt - Projets urgents EN HAUT
+        # Vue Gantt - Projets urgents EN HAUT (correction renforcée)
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -255,17 +255,17 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             
-            # Priorité pour trier les tâches (En cours en haut)
-            priority = {
-                "En cours": 1,
-                "En préparation": 2,
-                "Devis signé / Commande confirmée": 3,
-                "Devis envoyé": 4,
-                "Offre à faire": 5,
-                "En pause": 6,
-                "Terminé": 7
+            # Tri explicite par priorité (En cours en haut)
+            priority_map = {
+                "En cours": 0,
+                "En préparation": 1,
+                "Devis signé / Commande confirmée": 2,
+                "Devis envoyé": 3,
+                "Offre à faire": 4,
+                "En pause": 5,
+                "Terminé": 6
             }
-            gantt_df['priority'] = gantt_df['Status'].map(priority)
+            gantt_df['priority'] = gantt_df['Status'].map(priority_map)
             gantt_df = gantt_df.sort_values(by=['priority', 'Start'])
             
             status_order = ["En cours", "En préparation", "Devis signé / Commande confirmée", 
