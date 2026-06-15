@@ -11,8 +11,6 @@ key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
 # Initialisation session
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = "📊 Tableau de bord"
 if 'current_project_id' not in st.session_state:
     st.session_state.current_project_id = None
 
@@ -31,7 +29,7 @@ with st.sidebar:
     role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-    st.session_state.current_page = st.radio("Navigation", [
+    page = st.radio("Navigation", [
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
         "⚡ Encodage Rapide",
@@ -62,23 +60,23 @@ def add_task_to_project(project_id, template_id):
 
 # ====================== PAGES ======================
 
-if st.session_state.current_page == "📊 Tableau de bord":
+if page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
+    
     for _, proj in df.iterrows():
         col1, col2, col3 = st.columns([5, 2, 1.5])
         with col1:
-            if st.button(f"📂 {proj['name']}", key=f"btn_{proj['id']}"):
+            if st.button(f"📂 {proj['name']}", key=f"open_{proj['id']}"):
                 st.session_state.current_project_id = proj['id']
-                st.session_state.current_page = "📁 Fiche Chantier"
-                st.rerun()
+                st.rerun()   # Rafraîchit pour aller sur la fiche
         with col2:
             st.progress(float(proj['progress_pct']) / 100, text=f"{proj['progress_pct']}%")
         with col3:
             st.caption(proj['statut'])
         st.divider()
 
-elif st.session_state.current_page == "📁 Fiche Chantier":
+elif page == "📁 Fiche Chantier":
     if st.session_state.current_project_id is None:
         st.warning("Aucun chantier sélectionné. Retournez au Tableau de bord.")
     else:
@@ -98,8 +96,8 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.subheader("Ajouter une tâche depuis la bibliothèque")
         
         templates = get_task_templates()
-        search = st.text_input("🔍 Rechercher une tâche", key="add_task_search")
-        cat = st.selectbox("Catégorie", ["Toutes"] + sorted(templates["category"].unique().tolist()), key="add_task_cat")
+        search = st.text_input("🔍 Rechercher une tâche", key="task_search")
+        cat = st.selectbox("Catégorie", ["Toutes"] + sorted(templates["category"].unique().tolist()), key="task_cat")
         
         filtered = templates
         if search:
@@ -112,12 +110,12 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
             with col_a:
                 st.write(f"**{t['name']}** ({t['category']})")
             with col_b:
-                if st.button("Ajouter", key=f"addtask_{t['id']}"):
+                if st.button("Ajouter", key=f"add_{t['id']}"):
                     add_task_to_project(st.session_state.current_project_id, t['id'])
                     st.success(f"Tâche ajoutée : {t['name']}")
                     st.rerun()
 
-elif st.session_state.current_page == "📋 Bibliothèque Tâches":
+elif page == "📋 Bibliothèque Tâches":
     st.subheader("📋 Bibliothèque de Tâches Réutilisables")
     templates = get_task_templates()
     search = st.text_input("🔍 Rechercher")
