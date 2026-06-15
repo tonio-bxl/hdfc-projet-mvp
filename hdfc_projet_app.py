@@ -40,7 +40,6 @@ with st.sidebar:
     role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-
     pages = [
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
@@ -50,14 +49,11 @@ with st.sidebar:
     ]
     if role == "Administrateur":
         pages.append("➕ Créer un chantier")
-
     try:
         current_index = pages.index(st.session_state.current_page)
     except:
         current_index = 0
-
     page = st.radio("Navigation", pages, index=current_index)
-
     if page != st.session_state.current_page:
         st.session_state.current_page = page
         st.rerun()
@@ -100,13 +96,21 @@ def upload_photo(project_id, uploaded_file):
         st.error(f"Erreur upload : {e}")
         return None
 
+def get_task_library():
+    response = supabase.table("task_library").select("*").order("category").execute()
+    return pd.DataFrame(response.data)
+
+def add_task_to_project(project_id, task_data):
+    data = {"project_id": project_id, **task_data}
+    supabase.table("tasks").insert(data).execute()
+
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
         - [x] Gantt corrigé
         - [x] Fiche chantier compacte
         - [x] Upload + affichage photos
-        - [ ] Bibliothèque de tâches (catégories)
+        - [x] Bibliothèque de tâches (catégories/sous-catégories)
         """)
 
 # ============================================================
@@ -128,15 +132,15 @@ status_colors = {
 if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
-    
+   
     col_tri, col_ordre = st.columns(2)
     with col_tri:
         tri_par = st.selectbox("Trier par", ["Nom du projet", "Date de début", "Date d'échéance", "Avancement", "Statut"])
     with col_ordre:
         ordre = st.radio("Ordre", ["Décroissant", "Croissant"], horizontal=True)
-    
+   
     ascending = (ordre == "Croissant")
-    
+   
     if tri_par == "Nom du projet":
         df = df.sort_values("name", ascending=ascending)
     elif tri_par == "Date de début":
@@ -149,7 +153,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
         df = df.sort_values("progress_pct", ascending=ascending)
     elif tri_par == "Statut":
         df = df.sort_values("statut", ascending=ascending)
-    
+   
     for _, proj in df.iterrows():
         col1, col2, col3, col4, col5 = st.columns([4, 1.2, 1.2, 1.2, 1.2])
         with col1:
@@ -166,11 +170,11 @@ if st.session_state.current_page == "📊 Tableau de bord":
         with col5:
             st.caption(proj['statut'])
         st.divider()
-    
+   
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (avec upload et affichage photos)
+# PAGE : FICHE CHANTIER
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -181,16 +185,16 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         h1, h2, h3 { font-size: 22px !important; }
         </style>
     """, unsafe_allow_html=True)
-    
+   
     df = get_projects()
     project_options = {row['name']: row['id'] for _, row in df.iterrows()}
-    
+   
     if st.session_state.current_project_id:
         current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
     else:
         current_name = list(project_options.keys())[0]
         st.session_state.current_project_id = project_options[current_name]
-    
+   
     col_select, col_type, col_prog = st.columns([3.5, 2.5, 3])
     with col_select:
         selected_name = st.selectbox("Changer de chantier", options=list(project_options.keys()), index=list(project_options.keys()).index(current_name))
@@ -201,32 +205,32 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         pct = projet_temp.get('progress_pct', 0)
         st.metric("Avancement", f"{pct}%")
         st.progress(float(pct) / 100)
-    
+   
     if project_options[selected_name] != st.session_state.current_project_id:
         st.session_state.current_project_id = project_options[selected_name]
         st.rerun()
-    
+   
     projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
     st.subheader(projet["name"])
-    
+   
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a: st.metric("Client", projet.get("client_name", "—"))
     with col_b: st.metric("Statut", projet.get("statut", "—"))
     with col_c: st.metric("Début", projet.get('date_debut', '—'))
     with col_d: st.metric("Échéance", projet.get('date_fin_estimee', '—'))
-    
+   
     st.divider()
-    
+   
     # === UPLOAD ET AFFICHAGE PHOTOS ===
     st.subheader("📸 Photos du chantier")
-    
+   
     uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
     if uploaded_file and st.button("📤 Upload photo"):
         url = upload_photo(st.session_state.current_project_id, uploaded_file)
         if url:
             st.success("Photo uploadée avec succès !")
             st.rerun()
-    
+   
     # Affichage des photos
     photos = list_project_photos(st.session_state.current_project_id)
     if photos:
@@ -237,7 +241,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
                 st.image(url, use_column_width=True)
     else:
         st.info("Aucune photo pour ce chantier pour le moment.")
-    
+   
     st.divider()
     show_todo_list()
 
@@ -246,15 +250,15 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
-    
+   
     periode = st.selectbox(
         "Période à afficher",
         ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
         index=3
     )
-    
+   
     df = get_projects()
-    
+   
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
         from streamlit_calendar import calendar
         events = []
@@ -268,9 +272,9 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                     "end": str(proj['date_fin_estimee']),
                     "backgroundColor": color,
                 })
-        
+       
         initial_view = "timeGridWeek" if periode in ["1 Semaine", "2 Semaines"] else "dayGridMonth"
-        
+       
         calendar_options = {
             "editable": False,
             "selectable": True,
@@ -280,13 +284,13 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             "locale": "fr",
         }
         calendar(events=events, options=calendar_options)
-        
+       
         st.write("**Légende des statuts :**")
         cols = st.columns(len(status_colors))
         for i, (statut, color) in enumerate(status_colors.items()):
             with cols[i]:
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
-    
+   
     else:
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
@@ -299,7 +303,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                     "Progress": p.get('progress_pct', 0),
                     "Status": p['statut']
                 })
-        
+       
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             priority_map = {
@@ -313,9 +317,9 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             }
             gantt_df['priority'] = gantt_df['Status'].map(priority_map)
             gantt_df = gantt_df.sort_values(by=['priority', 'Start'])
-            
+           
             task_order = gantt_df["Task"].tolist()
-            
+           
             fig = px.timeline(
                 gantt_df,
                 x_start="Start",
@@ -326,17 +330,70 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 hover_data=["Progress"],
                 color_discrete_map=status_colors
             )
-            
+           
             fig.update_yaxes(categoryorder="array", categoryarray=task_order, autorange="reversed")
             fig.update_layout(height=750, showlegend=True, margin=dict(l=350))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Aucune date d'échéance disponible.")
-    
+   
     show_todo_list()
 
 # ============================================================
-# AUTRES PAGES
+# PAGE : BIBLIOTHÈQUE TÂCHES
+# ============================================================
+elif st.session_state.current_page == "📋 Bibliothèque Tâches":
+    st.subheader("📋 Bibliothèque de Tâches")
+    
+    df_lib = get_task_library()
+    
+    if df_lib.empty:
+        st.warning("Aucune tâche trouvée dans la bibliothèque.")
+        st.info("Exécute le SQL que je t’ai donné pour créer la table et les exemples.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            categories = ["Toutes"] + sorted(df_lib['category'].unique().tolist())
+            selected_cat = st.selectbox("Filtrer par Catégorie", categories)
+        
+        if selected_cat != "Toutes":
+            filtered_df = df_lib[df_lib['category'] == selected_cat]
+        else:
+            filtered_df = df_lib.copy()
+        
+        with col2:
+            subcats = ["Toutes"] + sorted(filtered_df['subcategory'].dropna().unique().tolist())
+            selected_subcat = st.selectbox("Filtrer par Sous-catégorie", subcats)
+        
+        if selected_subcat != "Toutes":
+            filtered_df = filtered_df[filtered_df['subcategory'] == selected_subcat]
+        
+        st.write(f"**{len(filtered_df)} tâche(s) trouvée(s)**")
+        
+        for _, task in filtered_df.iterrows():
+            with st.expander(f"**{task['name']}**  •  {task.get('estimated_duration', 'Durée non définie')}"):
+                st.write(task.get('description', ''))
+                if st.button("➕ Ajouter au chantier actuel", key=f"add_task_{task['id']}"):
+                    if st.session_state.current_project_id:
+                        task_to_add = {
+                            "name": task['name'],
+                            "description": task.get('description'),
+                            "category": task['category'],
+                            "subcategory": task.get('subcategory'),
+                            "status": "À faire",
+                            "estimated_hours": 2.0
+                        }
+                        add_task_to_project(st.session_state.current_project_id, task_to_add)
+                        st.success(f"✅ Tâche « {task['name']} » ajoutée au chantier !")
+                        st.rerun()
+                    else:
+                        st.warning("Va d’abord sur la page **Fiche Chantier** pour sélectionner un chantier.")
+    
+    st.divider()
+    show_todo_list()
+
+# ============================================================
+# AUTRES PAGES (Encodage Rapide + Créer chantier)
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
