@@ -84,7 +84,7 @@ def show_todo_list():
         """)
 
 # ============================================================
-# COULEURS HARMONISÉES
+# COULEURS HARMONISÉES (utilisées partout)
 # ============================================================
 status_colors = {
     "Offre à faire": "#94a3b8",
