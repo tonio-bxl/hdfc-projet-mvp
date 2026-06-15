@@ -75,12 +75,11 @@ def create_project(data):
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
-        - [ ] Afficher l'historique des événements + photos dans la fiche
-        - [ ] Upload photos + documents dans la création et la fiche
-        - [ ] Note vocale + transcription IA
+        - [ ] Ajouter les tâches dans la fiche chantier
+        - [ ] Afficher événements + photos dans la fiche
+        - [ ] Upload photos et documents
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF d'une fiche chantier
+        - [ ] Export PDF fiche chantier
         """)
 
 # ============================================================
@@ -239,7 +238,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt - Correction renforcée
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -255,7 +253,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             
-            # Tri par priorité (En cours = priorité maximale)
+            # TRI TRÈS FORT : priorité maximale pour "En cours"
             priority_map = {
                 "En cours": 0,
                 "En préparation": 1,
@@ -279,12 +277,12 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 color="Status",
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"],
-                color_discrete_map=status_colors,
-                category_orders={"Status": ["En cours", "En préparation", "Devis signé / Commande confirmée", "Devis envoyé", "Offre à faire", "En pause", "Terminé"]}
+                color_discrete_map=status_colors
             )
             
+            # Force l'ordre exact des tâches
             fig.update_yaxes(categoryorder="array", categoryarray=task_order)
-            fig.update_layout(height=650, showlegend=True)
+            fig.update_layout(height=700, showlegend=True, margin=dict(l=300))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Aucune date d'échéance disponible.")
