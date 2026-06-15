@@ -69,9 +69,6 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
-def create_project(data):
-    supabase.table("projects").insert(data).execute()
-
 def get_tasks(project_id):
     response = supabase.table("tasks").select("*").eq("project_id", project_id).execute()
     return pd.DataFrame(response.data)
@@ -80,14 +77,25 @@ def add_task(project_id, task_data):
     data = {"project_id": project_id, **task_data}
     supabase.table("tasks").insert(data).execute()
 
+def list_project_photos(project_id):
+    try:
+        files = supabase.storage.from_("project-photos").list(f"{project_id}/")
+        urls = []
+        for file in files:
+            url = supabase.storage.from_("project-photos").get_public_url(f"{project_id}/{file['name']}")
+            urls.append(url)
+        return urls
+    except:
+        return []
+
 def upload_photo(project_id, uploaded_file):
     if uploaded_file is None:
         return None
-    file_name = f"{project_id}/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    file_name = f"{project_id}/{timestamp}_{uploaded_file.name}"
     try:
-        res = supabase.storage.from_("project-photos").upload(file_name, uploaded_file.getvalue())
-        public_url = supabase.storage.from_("project-photos").get_public_url(file_name)
-        return public_url
+        supabase.storage.from_("project-photos").upload(file_name, uploaded_file.getvalue())
+        return supabase.storage.from_("project-photos").get_public_url(file_name)
     except Exception as e:
         st.error(f"Erreur upload : {e}")
         return None
@@ -97,9 +105,8 @@ def show_todo_list():
         st.markdown("""
         - [x] Gantt corrigé
         - [x] Fiche chantier compacte
-        - [x] Upload photos dans fiche chantier
-        - [ ] Bibliothèque de tâches (catégories / sous-catégories)
-        - [ ] Gestion fine des rôles
+        - [x] Upload + affichage photos
+        - [ ] Bibliothèque de tâches (catégories)
         """)
 
 # ============================================================
@@ -121,7 +128,28 @@ status_colors = {
 if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
-    # ... (code tableau de bord)
+    
+    col_tri, col_ordre = st.columns(2)
+    with col_tri:
+        tri_par = st.selectbox("Trier par", ["Nom du projet", "Date de début", "Date d'échéance", "Avancement", "Statut"])
+    with col_ordre:
+        ordre = st.radio("Ordre", ["Décroissant", "Croissant"], horizontal=True)
+    
+    ascending = (ordre == "Croissant")
+    
+    if tri_par == "Nom du projet":
+        df = df.sort_values("name", ascending=ascending)
+    elif tri_par == "Date de début":
+        df['date_debut'] = pd.to_datetime(df['date_debut'], errors='coerce')
+        df = df.sort_values("date_debut", ascending=ascending, na_position='last')
+    elif tri_par == "Date d'échéance":
+        df['date_fin_estimee'] = pd.to_datetime(df['date_fin_estimee'], errors='coerce')
+        df = df.sort_values("date_fin_estimee", ascending=ascending, na_position='last')
+    elif tri_par == "Avancement":
+        df = df.sort_values("progress_pct", ascending=ascending)
+    elif tri_par == "Statut":
+        df = df.sort_values("statut", ascending=ascending)
+    
     for _, proj in df.iterrows():
         col1, col2, col3, col4, col5 = st.columns([4, 1.2, 1.2, 1.2, 1.2])
         with col1:
@@ -138,10 +166,11 @@ if st.session_state.current_page == "📊 Tableau de bord":
         with col5:
             st.caption(proj['statut'])
         st.divider()
+    
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (avec upload photos)
+# PAGE : FICHE CHANTIER (avec upload et affichage photos)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -188,18 +217,26 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     
     st.divider()
     
-    # === UPLOAD PHOTOS ===
+    # === UPLOAD ET AFFICHAGE PHOTOS ===
     st.subheader("📸 Photos du chantier")
-    uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key="photo_uploader")
+    
+    uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
     if uploaded_file and st.button("📤 Upload photo"):
         url = upload_photo(st.session_state.current_project_id, uploaded_file)
         if url:
             st.success("Photo uploadée avec succès !")
-            st.image(url, width=400)
             st.rerun()
     
-    # Affichage des photos existantes (à améliorer plus tard avec table photos)
-    st.info("Les photos uploadées apparaîtront ici (fonctionnalité en cours d’amélioration).")
+    # Affichage des photos
+    photos = list_project_photos(st.session_state.current_project_id)
+    if photos:
+        st.write(f"{len(photos)} photo(s) :")
+        cols = st.columns(3)
+        for i, url in enumerate(photos):
+            with cols[i % 3]:
+                st.image(url, use_column_width=True)
+    else:
+        st.info("Aucune photo pour ce chantier pour le moment.")
     
     st.divider()
     show_todo_list()
@@ -209,9 +246,15 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
-    periode = st.selectbox("Période à afficher", ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"], index=3)
+    
+    periode = st.selectbox(
+        "Période à afficher",
+        ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
+        index=3
+    )
+    
     df = get_projects()
-    # (code Gantt conservé)
+    
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
         from streamlit_calendar import calendar
         events = []
@@ -219,31 +262,77 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             if pd.notna(proj.get('date_fin_estimee')):
                 start = proj.get('date_debut', '2026-06-01')
                 color = status_colors.get(proj['statut'], "#64748b")
-                events.append({"title": proj['name'][:50],"start": str(start),"end": str(proj['date_fin_estimee']),"backgroundColor": color})
+                events.append({
+                    "title": proj['name'][:50],
+                    "start": str(start),
+                    "end": str(proj['date_fin_estimee']),
+                    "backgroundColor": color,
+                })
+        
         initial_view = "timeGridWeek" if periode in ["1 Semaine", "2 Semaines"] else "dayGridMonth"
-        calendar_options = {"editable": False,"selectable": True,"headerToolbar": {"left": "today prev,next", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},"initialView": initial_view,"height": 720,"locale": "fr"}
+        
+        calendar_options = {
+            "editable": False,
+            "selectable": True,
+            "headerToolbar": {"left": "today prev,next", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
+            "initialView": initial_view,
+            "height": 720,
+            "locale": "fr",
+        }
         calendar(events=events, options=calendar_options)
+        
         st.write("**Légende des statuts :**")
         cols = st.columns(len(status_colors))
         for i, (statut, color) in enumerate(status_colors.items()):
             with cols[i]:
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
+    
     else:
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
             if pd.notna(p.get('date_fin_estimee')):
-                gantt_data.append({"Task": p["name"][:40],"Start": p.get('date_debut', '2026-06-01'),"Finish": p['date_fin_estimee'],"Progress": p.get('progress_pct', 0),"Status": p['statut']})
+                gantt_data.append({
+                    "Task": p["name"][:40],
+                    "Start": p.get('date_debut', '2026-06-01'),
+                    "Finish": p['date_fin_estimee'],
+                    "Progress": p.get('progress_pct', 0),
+                    "Status": p['statut']
+                })
+        
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
-            priority_map = {"En cours": 0,"En préparation": 1,"Devis signé / Commande confirmée": 2,"Devis envoyé": 3,"Offre à faire": 4,"En pause": 5,"Terminé": 6}
+            priority_map = {
+                "En cours": 0,
+                "En préparation": 1,
+                "Devis signé / Commande confirmée": 2,
+                "Devis envoyé": 3,
+                "Offre à faire": 4,
+                "En pause": 5,
+                "Terminé": 6
+            }
             gantt_df['priority'] = gantt_df['Status'].map(priority_map)
             gantt_df = gantt_df.sort_values(by=['priority', 'Start'])
+            
             task_order = gantt_df["Task"].tolist()
-            fig = px.timeline(gantt_df, x_start="Start", x_end="Finish", y="Task", color="Status", title=f"Vue Gantt - {periode}", hover_data=["Progress"], color_discrete_map=status_colors)
+            
+            fig = px.timeline(
+                gantt_df,
+                x_start="Start",
+                x_end="Finish",
+                y="Task",
+                color="Status",
+                title=f"Vue Gantt - {periode}",
+                hover_data=["Progress"],
+                color_discrete_map=status_colors
+            )
+            
             fig.update_yaxes(categoryorder="array", categoryarray=task_order, autorange="reversed")
             fig.update_layout(height=750, showlegend=True, margin=dict(l=350))
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Aucune date d'échéance disponible.")
+    
     show_todo_list()
 
 # ============================================================
