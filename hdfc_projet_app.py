@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import date
+import plotly.express as px
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -40,13 +41,7 @@ with st.sidebar:
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
 
-    pages = [
-        "📊 Tableau de bord",
-        "📁 Fiche Chantier",
-        "⚡ Encodage Rapide",
-        "📅 Planning & Agenda",
-        "📋 Bibliothèque Tâches"
-    ]
+    pages = ["📊 Tableau de bord", "📁 Fiche Chantier", "⚡ Encodage Rapide", "📅 Planning & Agenda", "📋 Bibliothèque Tâches"]
     if role == "Administrateur":
         pages.append("➕ Créer un chantier")
 
@@ -68,18 +63,14 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
-def create_project(data):
-    supabase.table("projects").insert(data).execute()
-
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
-        - [ ] Afficher l'historique des événements + photos dans la fiche
-        - [ ] Upload photos + documents dans la création et la fiche
-        - [ ] Note vocale + transcription IA
+        - [ ] Ajouter les tâches dans la fiche chantier
+        - [ ] Afficher événements + photos dans la fiche
+        - [ ] Upload photos et documents
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF d'une fiche chantier
+        - [ ] Export PDF fiche chantier
         """)
 
 # ============================================================
@@ -125,109 +116,81 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER
-# ============================================================
-elif st.session_state.current_page == "📁 Fiche Chantier":
-    st.markdown("<style>.stMarkdown, .stMetric {font-size: 14px !important;}</style>", unsafe_allow_html=True)
-    
-    df = get_projects()
-    project_options = {row['name']: row['id'] for _, row in df.iterrows()}
-    
-    if st.session_state.current_project_id:
-        current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
-    else:
-        current_name = list(project_options.keys())[0]
-        st.session_state.current_project_id = project_options[current_name]
-    
-    selected_name = st.selectbox("Changer de chantier", options=list(project_options.keys()), 
-                                index=list(project_options.keys()).index(current_name))
-    
-    if project_options[selected_name] != st.session_state.current_project_id:
-        st.session_state.current_project_id = project_options[selected_name]
-        st.rerun()
-    
-    projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
-    
-    st.subheader(projet["name"])
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Client", projet["client_name"])
-        st.metric("Type", projet["type_projet"])
-    with col2:
-        st.metric("Statut", projet["statut"])
-        st.progress(float(projet["progress_pct"]) / 100, text=f"{projet['progress_pct']}%")
-    with col3:
-        echeance = projet.get('date_fin_estimee', 'Non définie')
-        st.metric("📅 Date d'échéance", echeance)
-    
-    st.divider()
-    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
-    show_todo_list()
-
-# ============================================================
-# PAGE : PLANNING & AGENDA (Amélioré)
+# PAGE : PLANNING & AGENDA (HYBRIDE)
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
     
-    from streamlit_calendar import calendar
-    
-    df = get_projects()
-    
     periode = st.selectbox(
         "Période à afficher",
         ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
-        index=2
+        index=3
     )
     
-    events = []
-    for _, proj in df.iterrows():
-        if pd.notna(proj.get('date_fin_estimee')):
-            start = proj.get('date_debut', '2026-06-01')
-            events.append({
-                "title": proj['name'][:48],
-                "start": str(start),
-                "end": str(proj['date_fin_estimee']),
-                "backgroundColor": "#3b82f6" if proj.get('statut') == "En cours" else "#10b981",
-            })
+    df = get_projects()
     
-    if periode in ["1 Semaine", "2 Semaines"]:
-        initial_view = "timeGridWeek"
+    # ====================== VUE CALENDRIER (périodes courtes) ======================
+    if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
+        from streamlit_calendar import calendar
+        
+        events = []
+        for _, proj in df.iterrows():
+            if pd.notna(proj.get('date_fin_estimee')):
+                start = proj.get('date_debut', '2026-06-01')
+                events.append({
+                    "title": proj['name'][:45],
+                    "start": str(start),
+                    "end": str(proj['date_fin_estimee']),
+                    "backgroundColor": "#3b82f6" if proj['statut'] == "En cours" else "#10b981",
+                })
+        
+        initial_view = "timeGridWeek" if periode in ["1 Semaine", "2 Semaines"] else "dayGridMonth"
+        
+        calendar_options = {
+            "editable": False,
+            "selectable": True,
+            "headerToolbar": {"left": "today prev,next", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
+            "initialView": initial_view,
+            "height": 700,
+            "locale": "fr",
+        }
+        
+        calendar(events=events, options=calendar_options)
+    
+    # ====================== VUE TIMELINE / GANTT (périodes longues) ======================
     else:
-        initial_view = "dayGridMonth"
-    
-    calendar_options = {
-        "editable": False,
-        "selectable": True,
-        "headerToolbar": {
-            "left": "today prev,next",
-            "center": "title",
-            "right": "dayGridMonth,timeGridWeek,timeGridDay,listMonth"
-        },
-        "initialView": initial_view,
-        "height": 720,
-        "locale": "fr",
-    }
-    
-    calendar(events=events, options=calendar_options)
+        st.write(f"**Vue Timeline - {periode}**")
+        gantt_data = []
+        for _, p in df.iterrows():
+            if pd.notna(p.get('date_fin_estimee')):
+                gantt_data.append({
+                    "Task": p["name"][:40],
+                    "Start": p.get('date_debut', '2026-06-01'),
+                    "Finish": p['date_fin_estimee'],
+                    "Progress": p.get('progress_pct', 0),
+                    "Status": p['statut']
+                })
+        
+        if gantt_data:
+            fig = px.timeline(
+                pd.DataFrame(gantt_data),
+                x_start="Start",
+                x_end="Finish",
+                y="Task",
+                color="Status",
+                title=f"Vue Gantt - {periode}",
+                hover_data=["Progress"]
+            )
+            fig.update_layout(height=650, showlegend=True)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Aucune date d'échéance disponible.")
+
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER
+# AUTRES PAGES (simplifiées)
 # ============================================================
-elif st.session_state.current_page == "➕ Créer un chantier":
-    if role != "Administrateur":
-        st.error("Accès réservé à l'Administrateur.")
-    else:
-        st.subheader("➕ Créer un nouveau chantier")
-        with st.form("create_project_form"):
-            # ... (formulaire complet comme précédemment) ...
-            submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
-            if submitted:
-                # (logique de création)
-                st.success("Chantier créé !")
-    show_todo_list()
-
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
     show_todo_list()
