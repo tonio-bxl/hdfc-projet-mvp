@@ -110,10 +110,13 @@ def upload_photo(project_id, uploaded_file):
 
 def delete_photo(path):
     try:
-        supabase.storage.from_("project-photos").remove([path])
+        st.write(f"**DEBUG - Chemin envoyé à Supabase :** `{path}`")
+        result = supabase.storage.from_("project-photos").remove([path])
+        st.write(f"**DEBUG - Résultat Supabase :** {result}")
         return True
     except Exception as e:
-        st.error(f"Erreur suppression : {e}")
+        st.error(f"❌ ERREUR SUPPRESSION : {e}")
+        st.code(str(e))
         return False
 
 def get_task_library():
@@ -130,7 +133,7 @@ def show_todo_list():
         - [x] Gantt corrigé
         - [x] Fiche chantier compacte
         - [x] Upload + affichage photos par chantier
-        - [x] Suppression photo avec confirmation
+        - [x] Suppression photo avec confirmation + debug
         - [ ] Pouvoir encoder une nouvelle tâche / catégorie / sous-catégorie dans la DB
         """)
 
@@ -195,7 +198,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER
+# PAGE : FICHE CHANTIER (avec suppression photos)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -242,7 +245,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
    
     st.divider()
    
-    # === PHOTOS + SUPPRESSION ===
+    # === SECTION PHOTOS + SUPPRESSION ===
     st.subheader("📸 Photos du chantier")
    
     uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
@@ -262,22 +265,23 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     
     # Confirmation suppression
     if st.session_state.photo_to_delete:
-        st.warning("⚠️ Voulez-vous vraiment supprimer cette photo ?")
+        st.warning("⚠️ Confirmation de suppression")
+        st.write(f"Photo sélectionnée : `{st.session_state.photo_to_delete}`")
         col_yes, col_no = st.columns([1, 3])
         with col_yes:
-            if st.button("🗑️ Oui, supprimer définitivement", type="primary"):
+            if st.button("🗑️ OUI, SUPPRIMER DÉFINITIVEMENT", type="primary"):
                 if delete_photo(st.session_state.photo_to_delete):
-                    st.success("Photo supprimée")
                     st.session_state.photo_to_delete = None
+                    st.success("Photo supprimée avec succès")
                     st.rerun()
         with col_no:
-            if st.button("Annuler"):
+            if st.button("❌ Annuler"):
                 st.session_state.photo_to_delete = None
                 st.rerun()
         st.divider()
     
     if photos:
-        st.write(f"**{len(photos)} photo(s)**")
+        st.write(f"**{len(photos)} photo(s) disponible(s)**")
         cols = st.columns(3)
         for i, photo in enumerate(photos):
             with cols[i % 3]:
@@ -395,7 +399,7 @@ elif st.session_state.current_page == "📋 Bibliothèque Tâches":
     
     if df_lib.empty:
         st.warning("Aucune tâche trouvée dans la bibliothèque.")
-        st.info("Exécute le SQL de création de la table task_library.")
+        st.info("Exécute le SQL de création de la table task_library si nécessaire.")
     else:
         col1, col2 = st.columns(2)
         with col1:
