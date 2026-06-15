@@ -75,12 +75,11 @@ def create_project(data):
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
-        - [ ] Afficher l'historique des événements + photos dans la fiche
-        - [ ] Upload photos + documents dans la création et la fiche
-        - [ ] Note vocale + transcription IA
+        - [ ] Ajouter les tâches dans la fiche chantier
+        - [ ] Afficher événements + photos dans la fiche
+        - [ ] Upload photos et documents
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF d'une fiche chantier
+        - [ ] Export PDF fiche chantier
         """)
 
 # ============================================================
@@ -270,7 +269,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER (avec date de début)
+# PAGE : CRÉER UN CHANTIER (FORMULAIRE ALLÉGÉ)
 # ============================================================
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
@@ -278,8 +277,12 @@ elif st.session_state.current_page == "➕ Créer un chantier":
     else:
         st.subheader("➕ Créer un nouveau chantier")
         with st.form("create_project_form"):
-            nom_projet = st.text_input("Nom du projet *")
-            nom_client = st.text_input("Nom du client *")
+            col1, col2 = st.columns(2)
+            with col1:
+                nom_projet = st.text_input("Nom du projet *")
+            with col2:
+                nom_client = st.text_input("Nom du client *")
+            
             type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
             
             st.markdown("**Adresse**")
@@ -287,25 +290,30 @@ elif st.session_state.current_page == "➕ Créer un chantier":
             with col_rue: rue = st.text_input("Rue *")
             with col_num: numero = st.text_input("Numéro *")
             complement = st.text_input("Complément d'adresse")
+            
             col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
             with col_cp: code_postal = st.text_input("Code postal *")
             with col_ville: ville = st.text_input("Ville *")
             with col_pays: pays = st.text_input("Pays", value="Belgique")
             
-            telephone = st.text_input("Téléphone *")
-            email = st.text_input("Email *")
+            col_tel, col_email = st.columns(2)
+            with col_tel: telephone = st.text_input("Téléphone *")
+            with col_email: email = st.text_input("Email *")
             
-            col_statut, col_echeance = st.columns(2)
+            # Statut + Dates sur une ligne
+            col_statut, col_dates = st.columns([1, 2])
             with col_statut:
                 statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
-            with col_echeance:
-                date_echeance = st.date_input("Date d'échéance estimée *", value=date.today())
-            
-            date_debut = st.date_input("Date de début estimée", value=date.today())
+            with col_dates:
+                col_debut, col_fin = st.columns(2)
+                with col_debut:
+                    date_debut = st.date_input("Date de début estimée", value=date.today())
+                with col_fin:
+                    date_echeance = st.date_input("Date d'échéance estimée", value=date.today())
             
             ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
             is_c4 = st.checkbox("Projet Control4")
-            notes = st.text_area("Notes / Description", height=100)
+            notes = st.text_area("Notes / Description", height=80)
             
             submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
             
