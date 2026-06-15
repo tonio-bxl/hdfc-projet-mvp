@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+from datetime import date
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -56,6 +57,9 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
+def create_project(data):
+    supabase.table("projects").insert(data).execute()
+
 # ====================== PAGES ======================
 
 if st.session_state.current_page == "📊 Tableau de bord":
@@ -79,22 +83,15 @@ if st.session_state.current_page == "📊 Tableau de bord":
         st.divider()
 
 elif st.session_state.current_page == "📁 Fiche Chantier":
-    
-    # === Style police plus petite ===
     st.markdown("""
         <style>
-        .stMarkdown, .stMetric, .stSelectbox, .stButton, .stSuccess, .stInfo {
+        .stMarkdown, .stMetric, .stSelectbox, .stButton {
             font-size: 14px !important;
-        }
-        h1, h2, h3 {
-            font-size: 18px !important;
         }
         </style>
     """, unsafe_allow_html=True)
     
     df = get_projects()
-    
-    # Liste déroulante pour changer de chantier
     project_options = {row['name']: row['id'] for _, row in df.iterrows()}
     
     if st.session_state.current_project_id:
@@ -113,7 +110,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.session_state.current_project_id = project_options[selected_name]
         st.rerun()
     
-    # Affichage de la fiche
     projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
     
     st.subheader(projet["name"])
@@ -129,17 +125,88 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.metric("📅 Date d'échéance", echeance)
     
     st.divider()
-    st.info("Ici on affichera bientôt les tâches, événements, photos et notes du chantier.")
+    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
 
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
-        st.error("Seul l'Administrateur peut créer un nouveau chantier.")
+        st.error("Accès réservé à l'Administrateur.")
     else:
         st.subheader("➕ Créer un nouveau chantier")
-        st.info("Formulaire de création à venir dans la prochaine itération.")
+        
+        with st.form("create_project_form"):
+            nom_projet = st.text_input("Nom du projet *", placeholder="Ex: Villa Uccle - Home Cinéma + Acoustique")
+            nom_client = st.text_input("Nom du client *")
+            
+            type_chantier = st.selectbox("Type de chantier *", [
+                "Home Cinéma Control4",
+                "Domotique résidentielle C4",
+                "Intégration acoustique premium",
+                "Salles de cinéma privées",
+                "Signage & Visio professionnelle",
+                "Audio multiroom",
+                "Autre"
+            ])
+            
+            adresse = st.text_input("Adresse complète *", placeholder="Rue + n° + boîte + code postal + ville")
+            telephone = st.text_input("Téléphone *")
+            email = st.text_input("Email *")
+            
+            col_statut, col_echeance = st.columns(2)
+            with col_statut:
+                statut = st.selectbox("Statut *", [
+                    "Offre à faire",
+                    "Devis envoyé",
+                    "Devis signé / Commande confirmée",
+                    "En préparation",
+                    "En cours",
+                    "En pause",
+                    "Terminé"
+                ])
+            with col_echeance:
+                date_echeance = st.date_input("Date d'échéance estimée *", value=date.today())
+            
+            ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
+            is_c4 = st.checkbox("Projet Control4")
+            
+            notes = st.text_area("Notes / Description", height=100)
+            
+            submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
+            
+            if submitted:
+                if not nom_projet or not nom_client or not adresse or not telephone or not email:
+                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    data = {
+                        "name": nom_projet,
+                        "client_name": nom_client,
+                        "type_projet": type_chantier,
+                        "adresse": adresse,
+                        "statut": statut,
+                        "date_fin_estimee": str(date_echeance),
+                        "ca_estime_htva": ca_estime,
+                        "is_c4": 1 if is_c4 else 0,
+                        "notes": notes
+                    }
+                    create_project(data)
+                    st.success("✅ Chantier créé avec succès !")
+                    st.balloons()
 
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
+
+# ====================== TO-DO LIST ======================
+st.markdown("---")
+st.markdown("### 📋 To-Do List (à faire ensuite)")
+
+st.markdown("""
+- [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
+- [ ] Afficher l'historique des événements + photos dans la fiche
+- [ ] Upload photos + documents dans la création et la fiche
+- [ ] Note vocale + transcription IA (plus tard)
+- [ ] Améliorer la vue Planning & Agenda
+- [ ] Gestion des rôles (technicien ne voit que ses chantiers)
+- [ ] Export PDF d'une fiche chantier
+""")
