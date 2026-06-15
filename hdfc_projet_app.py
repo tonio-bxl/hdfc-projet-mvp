@@ -69,14 +69,18 @@ def get_projects():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
+def create_project(data):
+    supabase.table("projects").insert(data).execute()
+
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier
-        - [ ] Afficher événements + photos dans la fiche
-        - [ ] Upload photos et documents
+        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
+        - [ ] Afficher l'historique des événements + photos dans la fiche
+        - [ ] Upload photos + documents dans la création et la fiche
+        - [ ] Note vocale + transcription IA
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF fiche chantier
+        - [ ] Export PDF d'une fiche chantier
         """)
 
 # ============================================================
@@ -129,6 +133,53 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
+# PAGE : FICHE CHANTIER
+# ============================================================
+elif st.session_state.current_page == "📁 Fiche Chantier":
+    st.markdown("""
+        <style>
+        .stMarkdown, .stMetric, .stSelectbox, .stButton { font-size: 14px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    df = get_projects()
+    project_options = {row['name']: row['id'] for _, row in df.iterrows()}
+    
+    if st.session_state.current_project_id:
+        current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
+    else:
+        current_name = list(project_options.keys())[0]
+        st.session_state.current_project_id = project_options[current_name]
+    
+    selected_name = st.selectbox(
+        "Changer de chantier",
+        options=list(project_options.keys()),
+        index=list(project_options.keys()).index(current_name)
+    )
+    
+    if project_options[selected_name] != st.session_state.current_project_id:
+        st.session_state.current_project_id = project_options[selected_name]
+        st.rerun()
+    
+    projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
+    
+    st.subheader(projet["name"])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Client", projet["client_name"])
+        st.metric("Type", projet["type_projet"])
+    with col2:
+        st.metric("Statut", projet["statut"])
+        st.progress(float(projet["progress_pct"]) / 100, text=f"{projet['progress_pct']}%")
+    with col3:
+        echeance = projet.get('date_fin_estimee', 'Non définie')
+        st.metric("📅 Date d'échéance", echeance)
+    
+    st.divider()
+    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
+    show_todo_list()
+
+# ============================================================
 # PAGE : PLANNING & AGENDA (HYBRIDE)
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
@@ -137,7 +188,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     periode = st.selectbox(
         "Période à afficher",
         ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
-        index=3
+        index=2
     )
     
     df = get_projects()
@@ -184,9 +235,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
-            status_order = ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", 
-                           "En préparation", "En cours", "En pause", "Terminé"]
-            
             fig = px.timeline(
                 gantt_df,
                 x_start="Start",
@@ -194,14 +242,75 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 y="Task",
                 color="Status",
                 title=f"Vue Gantt - {periode}",
-                hover_data=["Progress"],
-                category_orders={"Status": status_order}
+                hover_data=["Progress"]
             )
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Aucune date d'échéance disponible.")
     
+    show_todo_list()
+
+# ============================================================
+# PAGE : CRÉER UN CHANTIER
+# ============================================================
+elif st.session_state.current_page == "➕ Créer un chantier":
+    if role != "Administrateur":
+        st.error("Accès réservé à l'Administrateur.")
+    else:
+        st.subheader("➕ Créer un nouveau chantier")
+        with st.form("create_project_form"):
+            nom_projet = st.text_input("Nom du projet *")
+            nom_client = st.text_input("Nom du client *")
+            type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
+            
+            st.markdown("**Adresse**")
+            col_rue, col_num = st.columns([3, 1])
+            with col_rue: rue = st.text_input("Rue *")
+            with col_num: numero = st.text_input("Numéro *")
+            complement = st.text_input("Complément d'adresse")
+            col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
+            with col_cp: code_postal = st.text_input("Code postal *")
+            with col_ville: ville = st.text_input("Ville *")
+            with col_pays: pays = st.text_input("Pays", value="Belgique")
+            
+            telephone = st.text_input("Téléphone *")
+            email = st.text_input("Email *")
+            
+            col_statut, col_echeance = st.columns(2)
+            with col_statut:
+                statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
+            with col_echeance:
+                date_echeance = st.date_input("Date d'échéance estimée *", value=date.today())
+            
+            ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
+            is_c4 = st.checkbox("Projet Control4")
+            notes = st.text_area("Notes / Description", height=100)
+            
+            submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
+            
+            if submitted:
+                if not all([nom_projet, nom_client, rue, numero, code_postal, ville, telephone, email]):
+                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    adresse_complete = f"{rue} {numero}"
+                    if complement: adresse_complete += f", {complement}"
+                    adresse_complete += f", {code_postal} {ville}, {pays}"
+                    
+                    data = {
+                        "name": nom_projet,
+                        "client_name": nom_client,
+                        "type_projet": type_chantier,
+                        "adresse": adresse_complete,
+                        "statut": statut,
+                        "date_fin_estimee": str(date_echeance),
+                        "ca_estime_htva": ca_estime,
+                        "is_c4": 1 if is_c4 else 0,
+                        "notes": notes
+                    }
+                    create_project(data)
+                    st.success("✅ Chantier créé avec succès !")
+                    st.balloons()
     show_todo_list()
 
 # ============================================================
