@@ -141,15 +141,15 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (version finale compacte)
+# PAGE : FICHE CHANTIER (ajustée selon tes retours)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
         <style>
         .stMetric label { font-size: 13.5px !important; }
-        .stMetric div[data-testid="stMetricValue"] { font-size: 16px !important; font-weight: 600; }
+        .stMetric div[data-testid="stMetricValue"] { font-size: 17px !important; font-weight: 600; }
         .stSelectbox { font-size: 14px !important; }
-        h1, h2, h3 { font-size: 21px !important; }
+        h1, h2, h3 { font-size: 22px !important; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -162,7 +162,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         current_name = list(project_options.keys())[0]
         st.session_state.current_project_id = project_options[current_name]
     
-    # Ligne supérieure : Changer de chantier + Type + Avancement + Barre
+    # Ligne supérieure
     col_select, col_type, col_prog = st.columns([3.5, 2.5, 3])
     with col_select:
         selected_name = st.selectbox(
@@ -186,7 +186,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     
     st.subheader(projet["name"])
     
-    # Infos compactes
+    # Infos
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         st.metric("Client", projet.get("client_name", "—"))
