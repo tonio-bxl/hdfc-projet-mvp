@@ -44,8 +44,8 @@ with st.sidebar:
     pages = [
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
-        "⚡ Encodage Rapide",
         "📅 Planning & Agenda",
+        "⚡ Encodage Rapide",
         "📋 Bibliothèque Tâches"
     ]
     if role == "Administrateur":
@@ -200,7 +200,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     periode = st.selectbox(
         "Période à afficher",
         ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
-        index=2
+        index=3   # Vue par défaut = 3 Mois
     )
     
     df = get_projects()
@@ -238,6 +238,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
+        # Vue Gantt - Projets urgents en haut
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -251,15 +252,21 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 })
         
         if gantt_data:
+            gantt_df = pd.DataFrame(gantt_data)
+            # Ordre inversé : projets urgents (En cours) en haut
+            status_order = ["En cours", "En préparation", "Devis signé / Commande confirmée", 
+                           "Devis envoyé", "Offre à faire", "En pause", "Terminé"]
+            
             fig = px.timeline(
-                pd.DataFrame(gantt_data),
+                gantt_df,
                 x_start="Start",
                 x_end="Finish",
                 y="Task",
                 color="Status",
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"],
-                color_discrete_map=status_colors
+                color_discrete_map=status_colors,
+                category_orders={"Status": status_order}
             )
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
@@ -269,7 +276,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER (FORMULAIRE RÉORGANISÉ)
+# PAGE : CRÉER UN CHANTIER
 # ============================================================
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
@@ -277,14 +284,12 @@ elif st.session_state.current_page == "➕ Créer un chantier":
     else:
         st.subheader("➕ Créer un nouveau chantier")
         with st.form("create_project_form"):
-            # Ligne 1 : Nom projet + Statut
             col1, col2 = st.columns([3, 2])
             with col1:
                 nom_projet = st.text_input("Nom du projet *")
             with col2:
                 statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
             
-            # Ligne 2 : Nom client + Type de chantier
             col1, col2 = st.columns([2, 3])
             with col1:
                 nom_client = st.text_input("Nom du client *")
@@ -292,24 +297,20 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                 type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
             
             st.markdown("**Adresse**")
-            # Ligne 3 : Rue + Numéro + Complément
             col_rue, col_num = st.columns([3, 1])
             with col_rue: rue = st.text_input("Rue *")
             with col_num: numero = st.text_input("Numéro *")
             complement = st.text_input("Complément d'adresse")
             
-            # Ligne 4 : CP + Ville + Pays
             col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
             with col_cp: code_postal = st.text_input("Code postal *")
             with col_ville: ville = st.text_input("Ville *")
             with col_pays: pays = st.text_input("Pays", value="Belgique")
             
-            # Ligne 5 : Téléphone + Email
             col_tel, col_email = st.columns(2)
             with col_tel: telephone = st.text_input("Téléphone *")
             with col_email: email = st.text_input("Email *")
             
-            # Ligne 6 : Dates
             col_debut, col_fin = st.columns(2)
             with col_debut:
                 date_debut = st.date_input("Date de début estimée", value=date.today())
