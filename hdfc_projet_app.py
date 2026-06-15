@@ -72,9 +72,18 @@ def get_projects():
 def create_project(data):
     supabase.table("projects").insert(data).execute()
 
+def get_tasks(project_id):
+    response = supabase.table("tasks").select("*").eq("project_id", project_id).execute()
+    return pd.DataFrame(response.data)
+
+def add_task(project_id, task_data):
+    data = {"project_id": project_id, **task_data}
+    supabase.table("tasks").insert(data).execute()
+
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
+        - [x] Gantt avec projets urgents en haut
         - [ ] Ajouter les tâches dans la fiche chantier
         - [ ] Afficher événements + photos dans la fiche
         - [ ] Upload photos et documents
@@ -145,7 +154,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER
+# PAGE : FICHE CHANTIER (améliorée avec tâches)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -182,17 +191,46 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.metric("Type", projet["type_projet"])
     with col2:
         st.metric("Statut", projet["statut"])
-        st.progress(float(projet["progress_pct"]) / 100, text=f"{projet['progress_pct']}%")
+        st.progress(float(projet.get("progress_pct", 0)) / 100, text=f"{projet.get('progress_pct', 0)}%")
     with col3:
         echeance = projet.get('date_fin_estimee', 'Non définie')
         st.metric("📅 Date d'échéance", echeance)
     
     st.divider()
-    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
+    
+    # === SECTION TÂCHES ===
+    st.subheader("📋 Tâches du chantier")
+    tasks_df = get_tasks(st.session_state.current_project_id)
+    
+    if not tasks_df.empty:
+        st.dataframe(tasks_df[["task_name", "status", "assigned_to", "due_date"]], use_container_width=True)
+    else:
+        st.info("Aucune tâche pour le moment.")
+    
+    # Ajout rapide de tâche
+    with st.expander("➕ Ajouter une tâche", expanded=False):
+        with st.form("add_task_form"):
+            task_name = st.text_input("Nom de la tâche")
+            task_status = st.selectbox("Statut", ["À faire", "En cours", "Terminé"])
+            assigned_to = st.text_input("Assigné à (ex: Installateur 3)")
+            due_date = st.date_input("Date limite", value=date.today())
+            submitted_task = st.form_submit_button("Ajouter la tâche")
+            
+            if submitted_task and task_name:
+                add_task(st.session_state.current_project_id, {
+                    "task_name": task_name,
+                    "status": task_status,
+                    "assigned_to": assigned_to,
+                    "due_date": str(due_date)
+                })
+                st.success("Tâche ajoutée !")
+                st.rerun()
+    
+    st.divider()
     show_todo_list()
 
 # ============================================================
-# PAGE : PLANNING & AGENDA (HYBRIDE)
+# PAGE : PLANNING & AGENDA
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
@@ -252,8 +290,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
-            
-            # TRI FORT par priorité
             priority_map = {
                 "En cours": 0,
                 "En préparation": 1,
@@ -288,80 +324,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER
-# ============================================================
-elif st.session_state.current_page == "➕ Créer un chantier":
-    if role != "Administrateur":
-        st.error("Accès réservé à l'Administrateur.")
-    else:
-        st.subheader("➕ Créer un nouveau chantier")
-        with st.form("create_project_form"):
-            col1, col2 = st.columns([3, 2])
-            with col1:
-                nom_projet = st.text_input("Nom du projet *")
-            with col2:
-                statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
-            
-            col1, col2 = st.columns([2, 3])
-            with col1:
-                nom_client = st.text_input("Nom du client *")
-            with col2:
-                type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
-            
-            st.markdown("**Adresse**")
-            col_rue, col_num = st.columns([3, 1])
-            with col_rue: rue = st.text_input("Rue *")
-            with col_num: numero = st.text_input("Numéro *")
-            complement = st.text_input("Complément d'adresse")
-            
-            col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
-            with col_cp: code_postal = st.text_input("Code postal *")
-            with col_ville: ville = st.text_input("Ville *")
-            with col_pays: pays = st.text_input("Pays", value="Belgique")
-            
-            col_tel, col_email = st.columns(2)
-            with col_tel: telephone = st.text_input("Téléphone *")
-            with col_email: email = st.text_input("Email *")
-            
-            col_debut, col_fin = st.columns(2)
-            with col_debut:
-                date_debut = st.date_input("Date de début estimée", value=date.today())
-            with col_fin:
-                date_echeance = st.date_input("Date d'échéance estimée", value=date.today())
-            
-            ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
-            is_c4 = st.checkbox("Projet Control4")
-            notes = st.text_area("Notes / Description", height=100)
-            
-            submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
-            
-            if submitted:
-                if not all([nom_projet, nom_client, rue, numero, code_postal, ville, telephone, email]):
-                    st.error("Veuillez remplir tous les champs obligatoires (*)")
-                else:
-                    adresse_complete = f"{rue} {numero}"
-                    if complement: adresse_complete += f", {complement}"
-                    adresse_complete += f", {code_postal} {ville}, {pays}"
-                    
-                    data = {
-                        "name": nom_projet,
-                        "client_name": nom_client,
-                        "type_projet": type_chantier,
-                        "adresse": adresse_complete,
-                        "statut": statut,
-                        "date_debut": str(date_debut),
-                        "date_fin_estimee": str(date_echeance),
-                        "ca_estime_htva": ca_estime,
-                        "is_c4": 1 if is_c4 else 0,
-                        "notes": notes
-                    }
-                    create_project(data)
-                    st.success("✅ Chantier créé avec succès !")
-                    st.balloons()
-    show_todo_list()
-
-# ============================================================
-# AUTRES PAGES
+# AUTRES PAGES (simplifiées pour l'instant)
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
