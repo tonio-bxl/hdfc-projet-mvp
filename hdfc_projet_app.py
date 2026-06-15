@@ -55,19 +55,14 @@ def list_project_photos(project_id):
         for file in files:
             if file.get('name'):
                 url = supabase.storage.from_("project-photos").get_public_url(f"{project_id}/{file['name']}")
-                photos.append({
-                    "name": file['name'],
-                    "url": url,
-                    "path": f"{project_id}/{file['name']}"
-                })
+                photos.append({"name": file['name'], "url": url, "path": f"{project_id}/{file['name']}"})
         return photos
     except Exception as e:
         st.error(f"Erreur listing: {e}")
         return []
 
 def upload_photo(project_id, uploaded_file):
-    if not uploaded_file or not project_id:
-        return None
+    if not uploaded_file or not project_id: return None
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     file_name = f"{project_id}/{timestamp}_{uploaded_file.name}"
     try:
@@ -82,17 +77,10 @@ def upload_photo(project_id, uploaded_file):
 
 def delete_photo(path):
     try:
-        st.write(f"**DEBUG - Chemin envoyé :** `{path}`")
         result = supabase.storage.from_("project-photos").remove([path])
-        st.write(f"**DEBUG - Résultat Supabase :** {result}")
-
-        if result and len(result) > 0:
-            return True
-        else:
-            st.warning("⚠️ Supabase n'a supprimé aucun fichier. Vérifie que le nom du fichier est EXACTEMENT le même dans Supabase Storage.")
-            return False
+        return bool(result and len(result) > 0)
     except Exception as e:
-        st.error(f"Erreur suppression : {e}")
+        st.error(f"Erreur suppression: {e}")
         return False
 
 def get_task_library():
@@ -102,8 +90,36 @@ def add_task_to_project(project_id, task_data):
     supabase.table("tasks").insert({"project_id": project_id, **task_data}).execute()
 
 def show_todo_list():
-    with st.expander("📋 To-Do List", expanded=False):
-        st.markdown("- [x] Upload photos\n- [x] Suppression photo avec confirmation\n- [ ] Encoder nouvelle tâche/catégorie")
+    with st.expander("📋 To-Do List - HD Full Concept (clique pour ouvrir/fermer)", expanded=True):
+        st.markdown("""
+        ### 🔥 Priorité haute (à faire en priorité)
+        - [ ] Supprimer les photos de manière fiable (problème policy DELETE + clé anon/service_role)
+        - [ ] Ajouter un formulaire pour **créer une nouvelle tâche + catégorie + sous-catégorie** directement depuis l’application (dans Bibliothèque Tâches)
+        - [ ] Corriger le content-type des photos (actuellement parfois `text/plain` au lieu de `image/jpeg`)
+        - [ ] Ajouter un bouton **"Supprimer toutes les photos de ce chantier"** avec confirmation
+
+        ### Améliorations photos
+        - [ ] Permettre l’upload de **plusieurs photos en même temps**
+        - [ ] Stocker les métadonnées des photos dans une table Supabase (`project_photos`) au lieu de se reposer uniquement sur Storage
+        - [ ] Ajouter la possibilité de **renommer** ou **réorganiser** les photos
+
+        ### Bibliothèque Tâches
+        - [x] Affichage par catégorie / sous-catégorie
+        - [x] Ajout d’une tâche existante à un chantier
+        - [ ] Pouvoir **modifier / supprimer** une tâche de la bibliothèque
+        - [ ] Recherche / filtre avancé dans la bibliothèque
+
+        ### Autres pages à développer
+        - [ ] Page **⚡ Encodage Rapide**
+        - [ ] Page **➕ Créer un chantier** (pour Administrateur)
+        - [ ] Améliorer la page Planning (filtres par technicien, vue jour, etc.)
+
+        ### Technique / Qualité
+        - [ ] Gérer les erreurs de façon plus propre (pas seulement st.error)
+        - [ ] Ajouter des spinners / loaders sur les actions longues
+        - [ ] Rafraîchissement automatique après les actions importantes
+        - [ ] Vérifier la cohérence des `project_id` entre la DB et les dossiers Storage
+        """)
 
 status_colors = {
     "Offre à faire": "#94a3b8", "Devis envoyé": "#f59e0b", "Devis signé / Commande confirmée": "#10b981",
@@ -120,18 +136,15 @@ if st.session_state.current_page == "📊 Tableau de bord":
     with col_ordre:
         ordre = st.radio("Ordre", ["Décroissant", "Croissant"], horizontal=True)
     ascending = (ordre == "Croissant")
-    if tri_par == "Nom du projet":
-        df = df.sort_values("name", ascending=ascending)
+    if tri_par == "Nom du projet": df = df.sort_values("name", ascending=ascending)
     elif tri_par == "Date de début":
         df['date_debut'] = pd.to_datetime(df['date_debut'], errors='coerce')
         df = df.sort_values("date_debut", ascending=ascending, na_position='last')
     elif tri_par == "Date d'échéance":
         df['date_fin_estimee'] = pd.to_datetime(df['date_fin_estimee'], errors='coerce')
         df = df.sort_values("date_fin_estimee", ascending=ascending, na_position='last')
-    elif tri_par == "Avancement":
-        df = df.sort_values("progress_pct", ascending=ascending)
-    elif tri_par == "Statut":
-        df = df.sort_values("statut", ascending=ascending)
+    elif tri_par == "Avancement": df = df.sort_values("progress_pct", ascending=ascending)
+    elif tri_par == "Statut": df = df.sort_values("statut", ascending=ascending)
 
     for _, proj in df.iterrows():
         col1, col2, col3, col4, col5 = st.columns([4, 1.2, 1.2, 1.2, 1.2])
@@ -140,8 +153,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
                 st.session_state.current_project_id = proj['id']
                 st.session_state.current_page = "📁 Fiche Chantier"
                 st.rerun()
-        with col2:
-            st.progress(float(proj.get('progress_pct', 0)) / 100, text=f"{proj.get('progress_pct', 0)}%")
+        with col2: st.progress(float(proj.get('progress_pct', 0)) / 100, text=f"{proj.get('progress_pct', 0)}%")
         with col3: st.caption(f"▶️ {proj.get('date_debut', 'N/A')}")
         with col4: st.caption(f"📅 {proj.get('date_fin_estimee', 'N/A')}")
         with col5: st.caption(proj['statut'])
@@ -151,7 +163,6 @@ if st.session_state.current_page == "📊 Tableau de bord":
 # ==================== FICHE CHANTIER ====================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""<style>.stMetric label { font-size: 13.5px !important; } .stMetric div[data-testid="stMetricValue"] { font-size: 17px !important; font-weight: 600; }</style>""", unsafe_allow_html=True)
-
     df = get_projects()
     project_options = {row['name']: row['id'] for _, row in df.iterrows()}
     if st.session_state.current_project_id:
@@ -177,7 +188,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
 
     projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
     st.subheader(projet["name"])
-
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a: st.metric("Client", projet.get("client_name", "—"))
     with col_b: st.metric("Statut", projet.get("statut", "—"))
@@ -188,7 +198,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     st.subheader("📸 Photos du chantier")
 
     uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
-
     col1, col2 = st.columns([1, 2])
     with col1:
         if uploaded_file and st.button("📤 Upload photo", type="primary"):
