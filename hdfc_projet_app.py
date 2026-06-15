@@ -252,10 +252,19 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda - Vue Calendrier")
     
     from streamlit_calendar import calendar
+    import pandas as pd
+    from datetime import datetime, timedelta
     
     df = get_projects()
     
-    # Transformation des projets en événements calendrier
+    # === Sélecteur de période ===
+    periode = st.selectbox(
+        "Période affichée",
+        ["Mois en cours", "3 prochains mois", "6 prochains mois"],
+        index=1
+    )
+    
+    # Transformation des projets en événements
     events = []
     for _, proj in df.iterrows():
         if pd.notna(proj.get('date_fin_estimee')):
@@ -267,15 +276,26 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 "backgroundColor": "#3b82f6" if proj['statut'] == "En cours" else "#10b981",
             })
     
+    # Options du calendrier selon la période choisie
+    if periode == "Mois en cours":
+        initial_view = "dayGridMonth"
+        header_right = "dayGridMonth,timeGridWeek,timeGridDay,listMonth"
+    elif periode == "3 prochains mois":
+        initial_view = "listMonth"
+        header_right = "listMonth,dayGridMonth"
+    else:  # 6 prochains mois
+        initial_view = "listMonth"
+        header_right = "listMonth,dayGridMonth"
+    
     calendar_options = {
         "editable": False,
         "selectable": True,
         "headerToolbar": {
             "left": "today prev,next",
             "center": "title",
-            "right": "dayGridMonth,timeGridWeek,timeGridDay,listMonth"
+            "right": header_right
         },
-        "initialView": "dayGridMonth",
+        "initialView": initial_view,
         "height": 700,
     }
     
@@ -288,7 +308,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     
     calendar(events=events, options=calendar_options, custom_css=custom_css)
     show_todo_list()
-
 # ============================================================
 # AUTRES PAGES
 # ============================================================
