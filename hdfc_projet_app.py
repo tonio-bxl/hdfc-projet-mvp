@@ -78,7 +78,6 @@ def show_todo_list():
         - [x] Gantt corrigé
         - [ ] Améliorations fiche chantier
         - [ ] Upload photos et documents
-        - [ ] Gestion fine des rôles
         """)
 
 # ============================================================
@@ -142,12 +141,14 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (version compacte)
+# PAGE : FICHE CHANTIER (version très compacte)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
         <style>
-        .stMarkdown, .stMetric, .stSelectbox, .stButton, .stTextInput { font-size: 13px !important; }
+        .stMetric label { font-size: 13px !important; }
+        .stMetric div[data-testid="stMetricValue"] { font-size: 15px !important; font-weight: bold; }
+        .stSelectbox { font-size: 13px !important; }
         h1, h2, h3 { font-size: 20px !important; }
         </style>
     """, unsafe_allow_html=True)
@@ -161,18 +162,18 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         current_name = list(project_options.keys())[0]
         st.session_state.current_project_id = project_options[current_name]
     
-    # Ligne supérieure : Changer de chantier + Type + Progression
-    col1, col2, col3 = st.columns([3, 2, 1.5])
-    with col1:
+    # Ligne supérieure compacte
+    col_select, col_type, col_progress = st.columns([3.5, 2.5, 2])
+    with col_select:
         selected_name = st.selectbox(
             "Changer de chantier",
             options=list(project_options.keys()),
             index=list(project_options.keys()).index(current_name)
         )
-    with col2:
+    with col_type:
         projet_temp = df[df['id'] == project_options[selected_name]].iloc[0]
         st.metric("Type", projet_temp.get("type_projet", "—"))
-    with col3:
+    with col_progress:
         st.metric("Avancement", f"{projet_temp.get('progress_pct', 0)}%")
     
     if project_options[selected_name] != st.session_state.current_project_id:
@@ -194,7 +195,8 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     with col_d:
         st.metric("Échéance", projet.get('date_fin_estimee', '—'))
     
-    st.progress(float(projet.get('progress_pct', 0)) / 100, text=f"Progression globale : {projet.get('progress_pct', 0)}%")
+    # Barre de progression juste en dessous
+    st.progress(float(projet.get('progress_pct', 0)) / 100)
     
     st.divider()
     st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
