@@ -10,7 +10,9 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# Initialisation session
+# Initialisation session state
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "📊 Tableau de bord"
 if 'current_project_id' not in st.session_state:
     st.session_state.current_project_id = None
 
@@ -29,13 +31,19 @@ with st.sidebar:
     role = st.selectbox("Votre rôle", ["Administrateur", "Technicien", "Programmeur C4", "Direction"])
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
-    page = st.radio("Navigation", [
+    
+    # Navigation manuelle
+    new_page = st.radio("Navigation", [
         "📊 Tableau de bord",
         "📁 Fiche Chantier",
         "⚡ Encodage Rapide",
         "📅 Planning & Agenda",
         "📋 Bibliothèque Tâches"
-    ])
+    ], key="sidebar_nav")
+    
+    if new_page != st.session_state.current_page:
+        st.session_state.current_page = new_page
+        st.rerun()
 
 # ====================== FONCTIONS ======================
 def get_projects():
@@ -60,7 +68,7 @@ def add_task_to_project(project_id, template_id):
 
 # ====================== PAGES ======================
 
-if page == "📊 Tableau de bord":
+if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
     
@@ -69,14 +77,15 @@ if page == "📊 Tableau de bord":
         with col1:
             if st.button(f"📂 {proj['name']}", key=f"open_{proj['id']}"):
                 st.session_state.current_project_id = proj['id']
-                st.rerun()   # Rafraîchit pour aller sur la fiche
+                st.session_state.current_page = "📁 Fiche Chantier"
+                st.rerun()
         with col2:
             st.progress(float(proj['progress_pct']) / 100, text=f"{proj['progress_pct']}%")
         with col3:
             st.caption(proj['statut'])
         st.divider()
 
-elif page == "📁 Fiche Chantier":
+elif st.session_state.current_page == "📁 Fiche Chantier":
     if st.session_state.current_project_id is None:
         st.warning("Aucun chantier sélectionné. Retournez au Tableau de bord.")
     else:
@@ -90,45 +99,15 @@ elif page == "📁 Fiche Chantier":
             st.metric("Type", projet["type_projet"])
         with col2:
             st.metric("Statut", projet["statut"])
-            st.progress(float(projet["progress_pct"]) / 100)
+            st.progress(float(projet["progress_pct"]) / 100, text=f"Avancement : {projet['progress_pct']}%")
         
         st.divider()
         st.subheader("Ajouter une tâche depuis la bibliothèque")
-        
-        templates = get_task_templates()
-        search = st.text_input("🔍 Rechercher une tâche", key="task_search")
-        cat = st.selectbox("Catégorie", ["Toutes"] + sorted(templates["category"].unique().tolist()), key="task_cat")
-        
-        filtered = templates
-        if search:
-            filtered = filtered[filtered["name"].str.contains(search, case=False, na=False)]
-        if cat != "Toutes":
-            filtered = filtered[filtered["category"] == cat]
-        
-        for _, t in filtered.iterrows():
-            col_a, col_b = st.columns([6, 1])
-            with col_a:
-                st.write(f"**{t['name']}** ({t['category']})")
-            with col_b:
-                if st.button("Ajouter", key=f"add_{t['id']}"):
-                    add_task_to_project(st.session_state.current_project_id, t['id'])
-                    st.success(f"Tâche ajoutée : {t['name']}")
-                    st.rerun()
+        # (code d'ajout de tâche à venir dans la prochaine étape)
 
-elif page == "📋 Bibliothèque Tâches":
-    st.subheader("📋 Bibliothèque de Tâches Réutilisables")
-    templates = get_task_templates()
-    search = st.text_input("🔍 Rechercher")
-    category = st.selectbox("Catégorie", ["Toutes"] + sorted(templates["category"].unique().tolist()))
-    
-    filtered = templates
-    if search:
-        filtered = filtered[filtered["name"].str.contains(search, case=False, na=False)]
-    if category != "Toutes":
-        filtered = filtered[filtered["category"] == category]
-    
-    st.dataframe(filtered[["category", "name", "description", "estimated_duration_days", "typical_assigned_to"]], 
-                use_container_width=True, hide_index=True)
+# Autres pages (simplifiées pour l'instant)
+else:
+    st.info(f"Page {st.session_state.current_page} en cours de développement.")
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
