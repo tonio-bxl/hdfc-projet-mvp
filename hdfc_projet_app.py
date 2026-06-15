@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import date
+import plotly.express as px   # ← Important pour la vue Gantt
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -13,7 +14,7 @@ key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
 # ============================================================
-# SESSION STATE (Gestion de la navigation)
+# SESSION STATE
 # ============================================================
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "📊 Tableau de bord"
@@ -31,7 +32,7 @@ with col2:
 st.divider()
 
 # ============================================================
-# SIDEBAR - NAVIGATION
+# SIDEBAR
 # ============================================================
 with st.sidebar:
     st.image("logo-HDFC.png", width=140)
@@ -47,7 +48,6 @@ with st.sidebar:
         "📅 Planning & Agenda",
         "📋 Bibliothèque Tâches"
     ]
-    
     if role == "Administrateur":
         pages.append("➕ Créer un chantier")
 
@@ -63,7 +63,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# FONCTIONS UTILES
+# FONCTIONS
 # ============================================================
 def get_projects():
     response = supabase.table("projects").select("*").execute()
@@ -72,12 +72,11 @@ def get_projects():
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
-        - [ ] Afficher l'historique des événements + photos dans la fiche
-        - [ ] Upload photos + documents dans la création et la fiche
-        - [ ] Note vocale + transcription IA
+        - [ ] Ajouter les tâches dans la fiche chantier
+        - [ ] Afficher événements + photos dans la fiche
+        - [ ] Upload photos et documents
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF d'une fiche chantier
+        - [ ] Export PDF fiche chantier
         """)
 
 # ============================================================
@@ -87,7 +86,6 @@ if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
     
-    # Options de tri
     col_tri, col_ordre = st.columns(2)
     with col_tri:
         tri_par = st.selectbox("Trier par", ["Nom du projet", "Date de début", "Date d'échéance", "Avancement", "Statut"])
@@ -131,53 +129,6 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER
-# ============================================================
-elif st.session_state.current_page == "📁 Fiche Chantier":
-    st.markdown("""
-        <style>
-        .stMarkdown, .stMetric, .stSelectbox, .stButton { font-size: 14px !important; }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    df = get_projects()
-    project_options = {row['name']: row['id'] for _, row in df.iterrows()}
-    
-    if st.session_state.current_project_id:
-        current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
-    else:
-        current_name = list(project_options.keys())[0]
-        st.session_state.current_project_id = project_options[current_name]
-    
-    selected_name = st.selectbox(
-        "Changer de chantier",
-        options=list(project_options.keys()),
-        index=list(project_options.keys()).index(current_name)
-    )
-    
-    if project_options[selected_name] != st.session_state.current_project_id:
-        st.session_state.current_project_id = project_options[selected_name]
-        st.rerun()
-    
-    projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
-    
-    st.subheader(projet["name"])
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Client", projet["client_name"])
-        st.metric("Type", projet["type_projet"])
-    with col2:
-        st.metric("Statut", projet["statut"])
-        st.progress(float(projet["progress_pct"]) / 100, text=f"{projet['progress_pct']}%")
-    with col3:
-        echeance = projet.get('date_fin_estimee', 'Non définie')
-        st.metric("📅 Date d'échéance", echeance)
-    
-    st.divider()
-    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
-    show_todo_list()
-
-# ============================================================
 # PAGE : PLANNING & AGENDA (HYBRIDE)
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
@@ -192,7 +143,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     df = get_projects()
     
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
-        # Vue Calendrier
+        # === VUE CALENDRIER ===
         from streamlit_calendar import calendar
         events = []
         for _, proj in df.iterrows():
@@ -218,7 +169,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         calendar(events=events, options=calendar_options)
     
     else:
-        # Vue Gantt / Timeline pour 3 et 6 mois
+        # === VUE TIMELINE / GANTT (3 et 6 mois) ===
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -241,15 +192,15 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"]
             )
-            fig.update_layout(height=650)
+            fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Aucune date disponible.")
+            st.info("Aucune date d'échéance disponible pour le moment.")
     
     show_todo_list()
 
 # ============================================================
-# AUTRES PAGES (temporaires)
+# AUTRES PAGES
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
