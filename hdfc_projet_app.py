@@ -84,7 +84,7 @@ def show_todo_list():
         """)
 
 # ============================================================
-# COULEURS HARMONISÉES (utilisées partout)
+# COULEURS HARMONISÉES
 # ============================================================
 status_colors = {
     "Offre à faire": "#94a3b8",
@@ -193,7 +193,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     show_todo_list()
 
 # ============================================================
-# PAGE : PLANNING & AGENDA (HYBRIDE + COULEURS COHÉRENTES)
+# PAGE : PLANNING & AGENDA (HYBRIDE)
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
@@ -207,7 +207,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     df = get_projects()
     
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
-        # Vue Calendrier
         from streamlit_calendar import calendar
         events = []
         for _, proj in df.iterrows():
@@ -233,7 +232,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         }
         calendar(events=events, options=calendar_options)
         
-        # Légende
         st.write("**Légende des statuts :**")
         cols = st.columns(len(status_colors))
         for i, (statut, color) in enumerate(status_colors.items()):
@@ -241,7 +239,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt pour 3 et 6 mois
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -273,7 +270,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER
+# PAGE : CRÉER UN CHANTIER (avec date de début)
 # ============================================================
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
@@ -304,6 +301,8 @@ elif st.session_state.current_page == "➕ Créer un chantier":
             with col_echeance:
                 date_echeance = st.date_input("Date d'échéance estimée *", value=date.today())
             
+            date_debut = st.date_input("Date de début estimée", value=date.today())
+            
             ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
             is_c4 = st.checkbox("Projet Control4")
             notes = st.text_area("Notes / Description", height=100)
@@ -324,6 +323,7 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                         "type_projet": type_chantier,
                         "adresse": adresse_complete,
                         "statut": statut,
+                        "date_debut": str(date_debut),
                         "date_fin_estimee": str(date_echeance),
                         "ca_estime_htva": ca_estime,
                         "is_c4": 1 if is_c4 else 0,
