@@ -239,7 +239,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt - Projets urgents EN HAUT (correction renforcée)
+        # Vue Gantt - Correction renforcée pour avoir "En cours" en haut
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -255,7 +255,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             
-            # Tri explicite par priorité (En cours en haut)
+            # Tri très explicite par priorité
             priority_map = {
                 "En cours": 0,
                 "En préparation": 1,
@@ -282,6 +282,10 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 color_discrete_map=status_colors,
                 category_orders={"Status": status_order}
             )
+            
+            # Force l'ordre des tâches selon le DataFrame trié
+            fig.update_yaxes(categoryorder="array", categoryarray=gantt_df["Task"].tolist())
+            
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
