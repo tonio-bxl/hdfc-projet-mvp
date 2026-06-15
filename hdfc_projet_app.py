@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import date
-import plotly.express as px
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -14,7 +13,7 @@ key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
 # ============================================================
-# SESSION STATE
+# SESSION STATE (Gestion de la navigation)
 # ============================================================
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "📊 Tableau de bord"
@@ -32,7 +31,7 @@ with col2:
 st.divider()
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR - NAVIGATION
 # ============================================================
 with st.sidebar:
     st.image("logo-HDFC.png", width=140)
@@ -41,7 +40,14 @@ with st.sidebar:
     st.caption(f"Connecté en tant que : **{role}**")
     st.divider()
 
-    pages = ["📊 Tableau de bord", "📁 Fiche Chantier", "⚡ Encodage Rapide", "📅 Planning & Agenda", "📋 Bibliothèque Tâches"]
+    pages = [
+        "📊 Tableau de bord",
+        "📁 Fiche Chantier",
+        "⚡ Encodage Rapide",
+        "📅 Planning & Agenda",
+        "📋 Bibliothèque Tâches"
+    ]
+    
     if role == "Administrateur":
         pages.append("➕ Créer un chantier")
 
@@ -57,7 +63,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# FONCTIONS
+# FONCTIONS UTILES
 # ============================================================
 def get_projects():
     response = supabase.table("projects").select("*").execute()
@@ -66,11 +72,12 @@ def get_projects():
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier
-        - [ ] Afficher événements + photos dans la fiche
-        - [ ] Upload photos et documents
+        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
+        - [ ] Afficher l'historique des événements + photos dans la fiche
+        - [ ] Upload photos + documents dans la création et la fiche
+        - [ ] Note vocale + transcription IA
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF fiche chantier
+        - [ ] Export PDF d'une fiche chantier
         """)
 
 # ============================================================
@@ -80,25 +87,30 @@ if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
     
+    # Options de tri
     col_tri, col_ordre = st.columns(2)
     with col_tri:
-        tri_par = st.selectbox("Trier par", ["Avancement", "Date d'échéance", "Statut", "Nom du projet"])
+        tri_par = st.selectbox("Trier par", ["Nom du projet", "Date de début", "Date d'échéance", "Avancement", "Statut"])
     with col_ordre:
         ordre = st.radio("Ordre", ["Décroissant", "Croissant"], horizontal=True)
     
     ascending = (ordre == "Croissant")
-    if tri_par == "Avancement":
-        df = df.sort_values("progress_pct", ascending=ascending)
+    
+    if tri_par == "Nom du projet":
+        df = df.sort_values("name", ascending=ascending)
+    elif tri_par == "Date de début":
+        df['date_debut'] = pd.to_datetime(df['date_debut'], errors='coerce')
+        df = df.sort_values("date_debut", ascending=ascending, na_position='last')
     elif tri_par == "Date d'échéance":
         df['date_fin_estimee'] = pd.to_datetime(df['date_fin_estimee'], errors='coerce')
         df = df.sort_values("date_fin_estimee", ascending=ascending, na_position='last')
+    elif tri_par == "Avancement":
+        df = df.sort_values("progress_pct", ascending=ascending)
     elif tri_par == "Statut":
         df = df.sort_values("statut", ascending=ascending)
-    elif tri_par == "Nom du projet":
-        df = df.sort_values("name", ascending=ascending)
     
     for _, proj in df.iterrows():
-        col1, col2, col3, col4 = st.columns([4.5, 1.5, 1.5, 1.5])
+        col1, col2, col3, col4, col5 = st.columns([4, 1.2, 1.2, 1.2, 1.2])
         with col1:
             if st.button(f"📂 {proj['name']}", key=f"open_{proj['id']}"):
                 st.session_state.current_project_id = proj['id']
@@ -107,12 +119,62 @@ if st.session_state.current_page == "📊 Tableau de bord":
         with col2:
             st.progress(float(proj['progress_pct']) / 100, text=f"{proj['progress_pct']}%")
         with col3:
+            debut = proj.get('date_debut', 'N/A')
+            st.caption(f"▶️ {debut}")
+        with col4:
             echeance = proj.get('date_fin_estimee', 'N/A')
             st.caption(f"📅 {echeance}")
-        with col4:
+        with col5:
             st.caption(proj['statut'])
         st.divider()
     
+    show_todo_list()
+
+# ============================================================
+# PAGE : FICHE CHANTIER
+# ============================================================
+elif st.session_state.current_page == "📁 Fiche Chantier":
+    st.markdown("""
+        <style>
+        .stMarkdown, .stMetric, .stSelectbox, .stButton { font-size: 14px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    df = get_projects()
+    project_options = {row['name']: row['id'] for _, row in df.iterrows()}
+    
+    if st.session_state.current_project_id:
+        current_name = df[df['id'] == st.session_state.current_project_id]['name'].values[0]
+    else:
+        current_name = list(project_options.keys())[0]
+        st.session_state.current_project_id = project_options[current_name]
+    
+    selected_name = st.selectbox(
+        "Changer de chantier",
+        options=list(project_options.keys()),
+        index=list(project_options.keys()).index(current_name)
+    )
+    
+    if project_options[selected_name] != st.session_state.current_project_id:
+        st.session_state.current_project_id = project_options[selected_name]
+        st.rerun()
+    
+    projet = df[df['id'] == st.session_state.current_project_id].iloc[0]
+    
+    st.subheader(projet["name"])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Client", projet["client_name"])
+        st.metric("Type", projet["type_projet"])
+    with col2:
+        st.metric("Statut", projet["statut"])
+        st.progress(float(projet["progress_pct"]) / 100, text=f"{projet['progress_pct']}%")
+    with col3:
+        echeance = projet.get('date_fin_estimee', 'Non définie')
+        st.metric("📅 Date d'échéance", echeance)
+    
+    st.divider()
+    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
     show_todo_list()
 
 # ============================================================
@@ -129,10 +191,9 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     
     df = get_projects()
     
-    # ====================== VUE CALENDRIER (périodes courtes) ======================
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
+        # Vue Calendrier
         from streamlit_calendar import calendar
-        
         events = []
         for _, proj in df.iterrows():
             if pd.notna(proj.get('date_fin_estimee')):
@@ -154,11 +215,10 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             "height": 700,
             "locale": "fr",
         }
-        
         calendar(events=events, options=calendar_options)
     
-    # ====================== VUE TIMELINE / GANTT (périodes longues) ======================
     else:
+        # Vue Gantt / Timeline pour 3 et 6 mois
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -181,15 +241,15 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"]
             )
-            fig.update_layout(height=650, showlegend=True)
+            fig.update_layout(height=650)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Aucune date d'échéance disponible.")
-
+            st.info("Aucune date disponible.")
+    
     show_todo_list()
 
 # ============================================================
-# AUTRES PAGES (simplifiées)
+# AUTRES PAGES (temporaires)
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
