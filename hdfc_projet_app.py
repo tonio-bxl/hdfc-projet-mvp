@@ -72,12 +72,22 @@ def get_projects():
 def create_project(data):
     supabase.table("projects").insert(data).execute()
 
+def get_tasks(project_id):
+    response = supabase.table("tasks").select("*").eq("project_id", project_id).execute()
+    return pd.DataFrame(response.data)
+
+def add_task(project_id, task_data):
+    data = {"project_id": project_id, **task_data}
+    supabase.table("tasks").insert(data).execute()
+
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [x] Gantt corrigé
-        - [ ] Améliorations fiche chantier
-        - [ ] Upload photos et documents
+        - [x] Gantt corrigé (urgents en haut)
+        - [x] Fiche chantier compacte
+        - [ ] Upload photos et documents dans fiche chantier
+        - [ ] Gestion fine des rôles
+        - [ ] Export PDF fiche chantier
         """)
 
 # ============================================================
@@ -141,7 +151,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (ajustée selon tes retours)
+# PAGE : FICHE CHANTIER (compacte + tâches)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -162,7 +172,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         current_name = list(project_options.keys())[0]
         st.session_state.current_project_id = project_options[current_name]
     
-    # Ligne supérieure
     col_select, col_type, col_prog = st.columns([3.5, 2.5, 3])
     with col_select:
         selected_name = st.selectbox(
@@ -186,7 +195,6 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     
     st.subheader(projet["name"])
     
-    # Infos
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         st.metric("Client", projet.get("client_name", "—"))
@@ -198,7 +206,34 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
         st.metric("Échéance", projet.get('date_fin_estimee', '—'))
     
     st.divider()
-    st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
+    
+    # === TÂCHES ===
+    st.subheader("📋 Tâches du chantier")
+    tasks_df = get_tasks(st.session_state.current_project_id)
+    
+    if not tasks_df.empty:
+        st.dataframe(tasks_df[["task_name", "status", "assigned_to", "due_date"]], use_container_width=True)
+    else:
+        st.info("Aucune tâche enregistrée pour ce chantier.")
+    
+    with st.expander("➕ Ajouter une nouvelle tâche", expanded=False):
+        with st.form("add_task_form"):
+            task_name = st.text_input("Nom de la tâche *")
+            task_status = st.selectbox("Statut", ["À faire", "En cours", "Terminé"])
+            assigned_to = st.text_input("Assigné à (ex: Installateur 2)")
+            due_date = st.date_input("Date limite", value=date.today())
+            submitted = st.form_submit_button("Ajouter la tâche")
+            if submitted and task_name:
+                add_task(st.session_state.current_project_id, {
+                    "task_name": task_name,
+                    "status": task_status,
+                    "assigned_to": assigned_to,
+                    "due_date": str(due_date)
+                })
+                st.success("Tâche ajoutée !")
+                st.rerun()
+    
+    st.divider()
     show_todo_list()
 
 # ============================================================
