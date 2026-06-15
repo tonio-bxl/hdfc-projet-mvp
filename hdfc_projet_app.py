@@ -78,19 +78,25 @@ def list_project_photos(project_id):
         files = supabase.storage.from_("project-photos").list(f"{project_id}/")
         urls = []
         for file in files:
-            url = supabase.storage.from_("project-photos").get_public_url(f"{project_id}/{file['name']}")
-            urls.append(url)
+            if file.get('name'):
+                url = supabase.storage.from_("project-photos").get_public_url(f"{project_id}/{file['name']}")
+                urls.append(url)
         return urls
-    except:
+    except Exception as e:
+        st.error(f"Erreur listing photos : {e}")
         return []
 
 def upload_photo(project_id, uploaded_file):
-    if uploaded_file is None:
+    if uploaded_file is None or not project_id:
         return None
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     file_name = f"{project_id}/{timestamp}_{uploaded_file.name}"
     try:
-        supabase.storage.from_("project-photos").upload(file_name, uploaded_file.getvalue())
+        supabase.storage.from_("project-photos").upload(
+            file_name, 
+            uploaded_file.getvalue(),
+            file_options={"content-type": uploaded_file.type}
+        )
         return supabase.storage.from_("project-photos").get_public_url(file_name)
     except Exception as e:
         st.error(f"Erreur upload : {e}")
@@ -109,8 +115,9 @@ def show_todo_list():
         st.markdown("""
         - [x] Gantt corrigé
         - [x] Fiche chantier compacte
-        - [x] Upload + affichage photos
-        - [x] Bibliothèque de tâches (catégories/sous-catégories)
+        - [x] Upload + affichage photos par chantier
+        - [ ] Pouvoir encoder une nouvelle tâche / catégorie / sous-catégorie dans la DB
+        - [ ] Bibliothèque de tâches avancée (recherche, édition, etc.)
         """)
 
 # ============================================================
@@ -174,7 +181,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER
+# PAGE : FICHE CHANTIER (avec upload photos amélioré)
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -221,14 +228,15 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
    
     st.divider()
    
-    # === UPLOAD ET AFFICHAGE PHOTOS ===
+    # === UPLOAD ET AFFICHAGE PHOTOS (version corrigée) ===
     st.subheader("📸 Photos du chantier")
    
     uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
-    if uploaded_file and st.button("📤 Upload photo"):
+    
+    if uploaded_file and st.button("📤 Upload photo", type="primary"):
         url = upload_photo(st.session_state.current_project_id, uploaded_file)
         if url:
-            st.success("Photo uploadée avec succès !")
+            st.success("✅ Photo uploadée avec succès !")
             st.rerun()
    
     # Affichage des photos
@@ -349,33 +357,33 @@ elif st.session_state.current_page == "📋 Bibliothèque Tâches":
     
     if df_lib.empty:
         st.warning("Aucune tâche trouvée dans la bibliothèque.")
-        st.info("Exécute le SQL que je t’ai donné pour créer la table et les exemples.")
+        st.info("Exécute le SQL de création de la table task_library si ce n'est pas déjà fait.")
     else:
         col1, col2 = st.columns(2)
         with col1:
             categories = ["Toutes"] + sorted(df_lib['category'].unique().tolist())
-            selected_cat = st.selectbox("Filtrer par Catégorie", categories)
+            selected_cat = st.selectbox("Catégorie", categories)
         
         if selected_cat != "Toutes":
-            filtered_df = df_lib[df_lib['category'] == selected_cat]
+            filtered = df_lib[df_lib['category'] == selected_cat]
         else:
-            filtered_df = df_lib.copy()
+            filtered = df_lib.copy()
         
         with col2:
-            subcats = ["Toutes"] + sorted(filtered_df['subcategory'].dropna().unique().tolist())
-            selected_subcat = st.selectbox("Filtrer par Sous-catégorie", subcats)
+            subcats = ["Toutes"] + sorted(filtered['subcategory'].dropna().unique().tolist())
+            selected_subcat = st.selectbox("Sous-catégorie", subcats)
         
         if selected_subcat != "Toutes":
-            filtered_df = filtered_df[filtered_df['subcategory'] == selected_subcat]
+            filtered = filtered[filtered['subcategory'] == selected_subcat]
         
-        st.write(f"**{len(filtered_df)} tâche(s) trouvée(s)**")
+        st.write(f"**{len(filtered)} tâche(s)**")
         
-        for _, task in filtered_df.iterrows():
-            with st.expander(f"**{task['name']}**  •  {task.get('estimated_duration', 'Durée non définie')}"):
+        for _, task in filtered.iterrows():
+            with st.expander(f"**{task['name']}**"):
                 st.write(task.get('description', ''))
-                if st.button("➕ Ajouter au chantier actuel", key=f"add_task_{task['id']}"):
+                if st.button("➕ Ajouter au chantier actuel", key=f"add_{task['id']}"):
                     if st.session_state.current_project_id:
-                        task_to_add = {
+                        task_data = {
                             "name": task['name'],
                             "description": task.get('description'),
                             "category": task['category'],
@@ -383,17 +391,17 @@ elif st.session_state.current_page == "📋 Bibliothèque Tâches":
                             "status": "À faire",
                             "estimated_hours": 2.0
                         }
-                        add_task_to_project(st.session_state.current_project_id, task_to_add)
-                        st.success(f"✅ Tâche « {task['name']} » ajoutée au chantier !")
+                        add_task_to_project(st.session_state.current_project_id, task_data)
+                        st.success(f"Tâche ajoutée au chantier !")
                         st.rerun()
                     else:
-                        st.warning("Va d’abord sur la page **Fiche Chantier** pour sélectionner un chantier.")
+                        st.warning("Sélectionne d'abord un chantier dans la Fiche Chantier.")
     
     st.divider()
     show_todo_list()
 
 # ============================================================
-# AUTRES PAGES (Encodage Rapide + Créer chantier)
+# AUTRES PAGES
 # ============================================================
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
