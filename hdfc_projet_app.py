@@ -60,11 +60,41 @@ def get_projects():
 def create_project(data):
     supabase.table("projects").insert(data).execute()
 
+# ====================== TO-DO LIST (visible partout) ======================
+def show_todo_list():
+    with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
+        st.markdown("""
+        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
+        - [ ] Afficher l'historique des événements + photos dans la fiche
+        - [ ] Upload photos + documents dans la création et la fiche
+        - [ ] Note vocale + transcription IA (plus tard)
+        - [ ] Améliorer la vue Planning & Agenda
+        - [ ] Gestion des rôles (technicien ne voit que ses chantiers)
+        - [ ] Export PDF d'une fiche chantier
+        """)
+
 # ====================== PAGES ======================
 
 if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
     df = get_projects()
+    
+    # === OPTIONS DE TRI ===
+    col_tri, col_ordre = st.columns(2)
+    with col_tri:
+        tri_par = st.selectbox("Trier par", ["Avancement", "Date d'échéance", "Statut", "Nom du projet"])
+    with col_ordre:
+        ordre = st.radio("Ordre", ["Décroissant", "Croissant"], horizontal=True)
+    
+    # Application du tri
+    if tri_par == "Avancement":
+        df = df.sort_values("progress_pct", ascending=(ordre == "Croissant"))
+    elif tri_par == "Date d'échéance":
+        df = df.sort_values("date_fin_estimee", ascending=(ordre == "Croissant"))
+    elif tri_par == "Statut":
+        df = df.sort_values("statut", ascending=(ordre == "Croissant"))
+    elif tri_par == "Nom du projet":
+        df = df.sort_values("name", ascending=(ordre == "Croissant"))
     
     for _, proj in df.iterrows():
         col1, col2, col3, col4 = st.columns([4.5, 1.5, 1.5, 1.5])
@@ -81,6 +111,8 @@ if st.session_state.current_page == "📊 Tableau de bord":
         with col4:
             st.caption(proj['statut'])
         st.divider()
+    
+    show_todo_list()
 
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -126,6 +158,8 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     
     st.divider()
     st.info("Ici on affichera bientôt les tâches, événements et photos du chantier.")
+    
+    show_todo_list()
 
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
@@ -147,7 +181,6 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                 "Autre"
             ])
             
-            # === ADRESSE SCINDÉE ===
             st.markdown("**Adresse**")
             col_rue, col_num = st.columns([3, 1])
             with col_rue:
@@ -193,7 +226,6 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                 if not nom_projet or not nom_client or not rue or not numero or not code_postal or not ville or not telephone or not email:
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                 else:
-                    # Construction de l'adresse complète
                     adresse_complete = f"{rue} {numero}"
                     if complement:
                         adresse_complete += f", {complement}"
@@ -213,9 +245,12 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                     create_project(data)
                     st.success("✅ Chantier créé avec succès dans Supabase !")
                     st.balloons()
+    
+    show_todo_list()
 
 else:
     st.info(f"Page **{st.session_state.current_page}** en cours de développement.")
+    show_todo_list()
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
