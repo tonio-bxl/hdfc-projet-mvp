@@ -269,7 +269,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     show_todo_list()
 
 # ============================================================
-# PAGE : CRÉER UN CHANTIER (FORMULAIRE ALLÉGÉ)
+# PAGE : CRÉER UN CHANTIER (FORMULAIRE RÉORGANISÉ)
 # ============================================================
 elif st.session_state.current_page == "➕ Créer un chantier":
     if role != "Administrateur":
@@ -277,43 +277,48 @@ elif st.session_state.current_page == "➕ Créer un chantier":
     else:
         st.subheader("➕ Créer un nouveau chantier")
         with st.form("create_project_form"):
-            col1, col2 = st.columns(2)
+            # Ligne 1 : Nom projet + Statut
+            col1, col2 = st.columns([3, 2])
             with col1:
                 nom_projet = st.text_input("Nom du projet *")
             with col2:
-                nom_client = st.text_input("Nom du client *")
+                statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
             
-            type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
+            # Ligne 2 : Nom client + Type de chantier
+            col1, col2 = st.columns([2, 3])
+            with col1:
+                nom_client = st.text_input("Nom du client *")
+            with col2:
+                type_chantier = st.selectbox("Type de chantier *", ["Home Cinéma Control4", "Domotique résidentielle C4", "Intégration acoustique premium", "Salles de cinéma privées", "Signage & Visio professionnelle", "Audio multiroom", "Autre"])
             
             st.markdown("**Adresse**")
+            # Ligne 3 : Rue + Numéro + Complément
             col_rue, col_num = st.columns([3, 1])
             with col_rue: rue = st.text_input("Rue *")
             with col_num: numero = st.text_input("Numéro *")
             complement = st.text_input("Complément d'adresse")
             
+            # Ligne 4 : CP + Ville + Pays
             col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
             with col_cp: code_postal = st.text_input("Code postal *")
             with col_ville: ville = st.text_input("Ville *")
             with col_pays: pays = st.text_input("Pays", value="Belgique")
             
+            # Ligne 5 : Téléphone + Email
             col_tel, col_email = st.columns(2)
             with col_tel: telephone = st.text_input("Téléphone *")
             with col_email: email = st.text_input("Email *")
             
-            # Statut + Dates sur une ligne
-            col_statut, col_dates = st.columns([1, 2])
-            with col_statut:
-                statut = st.selectbox("Statut *", ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", "En préparation", "En cours", "En pause", "Terminé"])
-            with col_dates:
-                col_debut, col_fin = st.columns(2)
-                with col_debut:
-                    date_debut = st.date_input("Date de début estimée", value=date.today())
-                with col_fin:
-                    date_echeance = st.date_input("Date d'échéance estimée", value=date.today())
+            # Ligne 6 : Dates
+            col_debut, col_fin = st.columns(2)
+            with col_debut:
+                date_debut = st.date_input("Date de début estimée", value=date.today())
+            with col_fin:
+                date_echeance = st.date_input("Date d'échéance estimée", value=date.today())
             
             ca_estime = st.number_input("CA estimé HTVA (€)", min_value=0, step=1000)
             is_c4 = st.checkbox("Projet Control4")
-            notes = st.text_area("Notes / Description", height=80)
+            notes = st.text_area("Notes / Description", height=100)
             
             submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
             
