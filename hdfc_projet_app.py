@@ -20,6 +20,8 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = "📊 Tableau de bord"
 if 'current_project_id' not in st.session_state:
     st.session_state.current_project_id = None
+if 'photo_to_delete' not in st.session_state:
+    st.session_state.photo_to_delete = None
 
 # ============================================================
 # HEADER
@@ -76,12 +78,16 @@ def add_task(project_id, task_data):
 def list_project_photos(project_id):
     try:
         files = supabase.storage.from_("project-photos").list(f"{project_id}/")
-        urls = []
+        photos = []
         for file in files:
             if file.get('name'):
                 url = supabase.storage.from_("project-photos").get_public_url(f"{project_id}/{file['name']}")
-                urls.append(url)
-        return urls
+                photos.append({
+                    "name": file['name'],
+                    "url": url,
+                    "path": f"{project_id}/{file['name']}"
+                })
+        return photos
     except Exception as e:
         st.error(f"Erreur listing photos : {e}")
         return []
@@ -99,9 +105,16 @@ def upload_photo(project_id, uploaded_file):
         )
         return supabase.storage.from_("project-photos").get_public_url(file_name)
     except Exception as e:
-        st.error(f"❌ ERREUR UPLOAD DÉTAILLÉE : {str(e)}")
-        st.code(str(e))  # affiche l'erreur complète Supabase
+        st.error(f"Erreur upload : {e}")
         return None
+
+def delete_photo(path):
+    try:
+        supabase.storage.from_("project-photos").remove([path])
+        return True
+    except Exception as e:
+        st.error(f"Erreur suppression : {e}")
+        return False
 
 def get_task_library():
     response = supabase.table("task_library").select("*").order("category").execute()
@@ -116,9 +129,9 @@ def show_todo_list():
         st.markdown("""
         - [x] Gantt corrigé
         - [x] Fiche chantier compacte
-        - [x] Upload + affichage photos par chantier (debug amélioré)
+        - [x] Upload + affichage photos par chantier
+        - [x] Suppression photo avec confirmation
         - [ ] Pouvoir encoder une nouvelle tâche / catégorie / sous-catégorie dans la DB
-        - [ ] Bibliothèque de tâches avancée
         """)
 
 # ============================================================
@@ -135,7 +148,7 @@ status_colors = {
 }
 
 # ============================================================
-# PAGE : TABLEAU DE BORD (inchangé)
+# PAGE : TABLEAU DE BORD
 # ============================================================
 if st.session_state.current_page == "📊 Tableau de bord":
     st.subheader("Vue d'ensemble des chantiers")
@@ -182,7 +195,7 @@ if st.session_state.current_page == "📊 Tableau de bord":
     show_todo_list()
 
 # ============================================================
-# PAGE : FICHE CHANTIER (upload photos corrigé)
+# PAGE : FICHE CHANTIER
 # ============================================================
 elif st.session_state.current_page == "📁 Fiche Chantier":
     st.markdown("""
@@ -229,14 +242,10 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
    
     st.divider()
    
-    # === UPLOAD PHOTOS (version debug) ===
+    # === PHOTOS + SUPPRESSION ===
     st.subheader("📸 Photos du chantier")
    
-    uploaded_file = st.file_uploader(
-        "Ajouter une photo", 
-        type=["png", "jpg", "jpeg"], 
-        key=f"photo_{st.session_state.current_project_id}"
-    )
+    uploaded_file = st.file_uploader("Ajouter une photo", type=["png", "jpg", "jpeg"], key=f"photo_{st.session_state.current_project_id}")
     
     col_btn, col_refresh = st.columns([1, 2])
     with col_btn:
@@ -245,19 +254,37 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
             if url:
                 st.success("✅ Photo uploadée avec succès !")
                 st.rerun()
-    
     with col_refresh:
         if st.button("🔄 Rafraîchir les photos"):
             st.rerun()
    
-    # Affichage des photos
     photos = list_project_photos(st.session_state.current_project_id)
+    
+    # Confirmation suppression
+    if st.session_state.photo_to_delete:
+        st.warning("⚠️ Voulez-vous vraiment supprimer cette photo ?")
+        col_yes, col_no = st.columns([1, 3])
+        with col_yes:
+            if st.button("🗑️ Oui, supprimer définitivement", type="primary"):
+                if delete_photo(st.session_state.photo_to_delete):
+                    st.success("Photo supprimée")
+                    st.session_state.photo_to_delete = None
+                    st.rerun()
+        with col_no:
+            if st.button("Annuler"):
+                st.session_state.photo_to_delete = None
+                st.rerun()
+        st.divider()
+    
     if photos:
-        st.write(f"{len(photos)} photo(s) :")
+        st.write(f"**{len(photos)} photo(s)**")
         cols = st.columns(3)
-        for i, url in enumerate(photos):
+        for i, photo in enumerate(photos):
             with cols[i % 3]:
-                st.image(url, use_column_width=True)
+                st.image(photo["url"], use_column_width=True)
+                if st.button("🗑️ Supprimer cette photo", key=f"del_{i}"):
+                    st.session_state.photo_to_delete = photo["path"]
+                    st.rerun()
     else:
         st.info("Aucune photo pour ce chantier pour le moment.")
    
@@ -265,7 +292,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     show_todo_list()
 
 # ============================================================
-# PAGE : PLANNING & AGENDA (inchangé)
+# PAGE : PLANNING & AGENDA
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
@@ -368,6 +395,7 @@ elif st.session_state.current_page == "📋 Bibliothèque Tâches":
     
     if df_lib.empty:
         st.warning("Aucune tâche trouvée dans la bibliothèque.")
+        st.info("Exécute le SQL de création de la table task_library.")
     else:
         col1, col2 = st.columns(2)
         with col1:
@@ -402,10 +430,10 @@ elif st.session_state.current_page == "📋 Bibliothèque Tâches":
                             "estimated_hours": 2.0
                         }
                         add_task_to_project(st.session_state.current_project_id, task_data)
-                        st.success(f"Tâche ajoutée !")
+                        st.success(f"Tâche ajoutée au chantier !")
                         st.rerun()
                     else:
-                        st.warning("Sélectionne d'abord un chantier.")
+                        st.warning("Sélectionne d'abord un chantier dans la Fiche Chantier.")
     
     st.divider()
     show_todo_list()
