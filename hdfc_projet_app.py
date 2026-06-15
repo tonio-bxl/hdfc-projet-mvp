@@ -147,7 +147,24 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                 "Autre"
             ])
             
-            adresse = st.text_input("Adresse complète *", placeholder="Rue + n° + boîte + code postal + ville")
+            # === ADRESSE SCINDÉE ===
+            st.markdown("**Adresse**")
+            col_rue, col_num = st.columns([3, 1])
+            with col_rue:
+                rue = st.text_input("Rue *")
+            with col_num:
+                numero = st.text_input("Numéro *")
+            
+            complement = st.text_input("Complément d'adresse (boîte, étage, etc.)")
+            
+            col_cp, col_ville, col_pays = st.columns([1.5, 2, 1.5])
+            with col_cp:
+                code_postal = st.text_input("Code postal *")
+            with col_ville:
+                ville = st.text_input("Ville *")
+            with col_pays:
+                pays = st.text_input("Pays", value="Belgique")
+            
             telephone = st.text_input("Téléphone *")
             email = st.text_input("Email *")
             
@@ -173,14 +190,20 @@ elif st.session_state.current_page == "➕ Créer un chantier":
             submitted = st.form_submit_button("✅ Créer le chantier", type="primary")
             
             if submitted:
-                if not nom_projet or not nom_client or not adresse or not telephone or not email:
+                if not nom_projet or not nom_client or not rue or not numero or not code_postal or not ville or not telephone or not email:
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                 else:
+                    # Construction de l'adresse complète
+                    adresse_complete = f"{rue} {numero}"
+                    if complement:
+                        adresse_complete += f", {complement}"
+                    adresse_complete += f", {code_postal} {ville}, {pays}"
+                    
                     data = {
                         "name": nom_projet,
                         "client_name": nom_client,
                         "type_projet": type_chantier,
-                        "adresse": adresse,
+                        "adresse": adresse_complete,
                         "statut": statut,
                         "date_fin_estimee": str(date_echeance),
                         "ca_estime_htva": ca_estime,
@@ -188,7 +211,7 @@ elif st.session_state.current_page == "➕ Créer un chantier":
                         "notes": notes
                     }
                     create_project(data)
-                    st.success("✅ Chantier créé avec succès !")
+                    st.success("✅ Chantier créé avec succès dans Supabase !")
                     st.balloons()
 
 else:
@@ -196,17 +219,3 @@ else:
 
 st.divider()
 st.caption("HD Full Concept SA — Prototype Supabase | Juin 2026")
-
-# ====================== TO-DO LIST ======================
-st.markdown("---")
-st.markdown("### 📋 To-Do List (à faire ensuite)")
-
-st.markdown("""
-- [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
-- [ ] Afficher l'historique des événements + photos dans la fiche
-- [ ] Upload photos + documents dans la création et la fiche
-- [ ] Note vocale + transcription IA (plus tard)
-- [ ] Améliorer la vue Planning & Agenda
-- [ ] Gestion des rôles (technicien ne voit que ses chantiers)
-- [ ] Export PDF d'une fiche chantier
-""")
