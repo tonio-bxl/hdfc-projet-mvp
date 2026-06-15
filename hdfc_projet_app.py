@@ -201,7 +201,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             if pd.notna(proj.get('date_fin_estimee')):
                 start = proj.get('date_debut', '2026-06-01')
                 events.append({
-                    "title": proj['name'][:45],
+                    "title": proj['name'][:50],
                     "start": str(start),
                     "end": str(proj['date_fin_estimee']),
                     "backgroundColor": "#3b82f6" if proj['statut'] == "En cours" else "#10b981",
@@ -214,11 +214,11 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             "selectable": True,
             "headerToolbar": {"left": "today prev,next", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
             "initialView": initial_view,
-            "height": 700,
+            "height": 720,
             "locale": "fr",
         }
         calendar(events=events, options=calendar_options)
-    
+        
     else:
         # Vue Gantt pour 3 et 6 mois
         st.write(f"**Vue Timeline - {periode}**")
@@ -234,9 +234,8 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 })
         
         if gantt_data:
-            gantt_df = pd.DataFrame(gantt_data)
             fig = px.timeline(
-                gantt_df,
+                pd.DataFrame(gantt_data),
                 x_start="Start",
                 x_end="Finish",
                 y="Task",
