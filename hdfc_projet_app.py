@@ -253,7 +253,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
             
-            # TRI TRÈS FORT : priorité maximale pour "En cours"
+            # TRI FORT : En cours en haut
             priority_map = {
                 "En cours": 0,
                 "En préparation": 1,
@@ -266,7 +266,6 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
             gantt_df['priority'] = gantt_df['Status'].map(priority_map)
             gantt_df = gantt_df.sort_values(by=['priority', 'Start'])
             
-            # Force l'ordre des tâches dans l'axe Y
             task_order = gantt_df["Task"].tolist()
             
             fig = px.timeline(
@@ -280,9 +279,9 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 color_discrete_map=status_colors
             )
             
-            # Force l'ordre exact des tâches
+            # Force l'ordre exact
             fig.update_yaxes(categoryorder="array", categoryarray=task_order)
-            fig.update_layout(height=700, showlegend=True, margin=dict(l=300))
+            fig.update_layout(height=700, showlegend=True, margin=dict(l=320))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Aucune date d'échéance disponible.")
