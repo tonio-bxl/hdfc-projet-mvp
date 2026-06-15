@@ -75,11 +75,12 @@ def create_project(data):
 def show_todo_list():
     with st.expander("📋 To-Do List (clique pour ouvrir/fermer)", expanded=False):
         st.markdown("""
-        - [ ] Ajouter les tâches dans la fiche chantier
-        - [ ] Afficher événements + photos dans la fiche
-        - [ ] Upload photos et documents
+        - [ ] Ajouter les tâches dans la fiche chantier (depuis la bibliothèque)
+        - [ ] Afficher l'historique des événements + photos dans la fiche
+        - [ ] Upload photos + documents dans la création et la fiche
+        - [ ] Note vocale + transcription IA
         - [ ] Gestion fine des rôles
-        - [ ] Export PDF fiche chantier
+        - [ ] Export PDF d'une fiche chantier
         """)
 
 # ============================================================
@@ -200,7 +201,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     periode = st.selectbox(
         "Période à afficher",
         ["1 Semaine", "2 Semaines", "1 Mois", "3 Mois", "6 Mois"],
-        index=3   # Vue par défaut = 3 Mois
+        index=3
     )
     
     df = get_projects()
@@ -238,7 +239,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
     
     else:
-        # Vue Gantt - Projets urgents en haut
+        # Vue Gantt - Projets urgents EN HAUT
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -253,7 +254,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
-            # Ordre inversé : projets urgents (En cours) en haut
+            # Ordre prioritaire : En cours en haut
             status_order = ["En cours", "En préparation", "Devis signé / Commande confirmée", 
                            "Devis envoyé", "Offre à faire", "En pause", "Terminé"]
             
