@@ -84,6 +84,19 @@ def show_todo_list():
         """)
 
 # ============================================================
+# COULEURS HARMONISÉES
+# ============================================================
+status_colors = {
+    "Offre à faire": "#94a3b8",
+    "Devis envoyé": "#f59e0b",
+    "Devis signé / Commande confirmée": "#10b981",
+    "En préparation": "#3b82f6",
+    "En cours": "#ef4444",
+    "En pause": "#6b7280",
+    "Terminé": "#22c55e"
+}
+
+# ============================================================
 # PAGE : TABLEAU DE BORD
 # ============================================================
 if st.session_state.current_page == "📊 Tableau de bord":
@@ -180,7 +193,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     show_todo_list()
 
 # ============================================================
-# PAGE : PLANNING & AGENDA (HYBRIDE)
+# PAGE : PLANNING & AGENDA (HYBRIDE + COULEURS COHÉRENTES)
 # ============================================================
 elif st.session_state.current_page == "📅 Planning & Agenda":
     st.subheader("📅 Planning & Agenda Global")
@@ -200,11 +213,12 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         for _, proj in df.iterrows():
             if pd.notna(proj.get('date_fin_estimee')):
                 start = proj.get('date_debut', '2026-06-01')
+                color = status_colors.get(proj['statut'], "#64748b")
                 events.append({
                     "title": proj['name'][:50],
                     "start": str(start),
                     "end": str(proj['date_fin_estimee']),
-                    "backgroundColor": "#3b82f6" if proj['statut'] == "En cours" else "#10b981",
+                    "backgroundColor": color,
                 })
         
         initial_view = "timeGridWeek" if periode in ["1 Semaine", "2 Semaines"] else "dayGridMonth"
@@ -219,6 +233,13 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         }
         calendar(events=events, options=calendar_options)
         
+        # Légende
+        st.write("**Légende des statuts :**")
+        cols = st.columns(len(status_colors))
+        for i, (statut, color) in enumerate(status_colors.items()):
+            with cols[i]:
+                st.markdown(f"<span style='color:{color}; font-size:18px;'>■</span> {statut}", unsafe_allow_html=True)
+    
     else:
         # Vue Gantt pour 3 et 6 mois
         st.write(f"**Vue Timeline - {periode}**")
@@ -241,7 +262,8 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 y="Task",
                 color="Status",
                 title=f"Vue Gantt - {periode}",
-                hover_data=["Progress"]
+                hover_data=["Progress"],
+                color_discrete_map=status_colors
             )
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
