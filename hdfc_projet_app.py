@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import date
-import plotly.express as px   # ← Important pour la vue Gantt
+import plotly.express as px
 
 st.set_page_config(page_title="HD Full Concept - Projets", layout="wide", page_icon="🔊")
 
@@ -143,7 +143,7 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
     df = get_projects()
     
     if periode in ["1 Semaine", "2 Semaines", "1 Mois"]:
-        # === VUE CALENDRIER ===
+        # Vue Calendrier
         from streamlit_calendar import calendar
         events = []
         for _, proj in df.iterrows():
@@ -168,8 +168,8 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         }
         calendar(events=events, options=calendar_options)
     
-       else:
-        # === VUE TIMELINE / GANTT (3 et 6 mois) ===
+    else:
+        # Vue Gantt pour 3 et 6 mois
         st.write(f"**Vue Timeline - {periode}**")
         gantt_data = []
         for _, p in df.iterrows():
@@ -184,17 +184,8 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
         
         if gantt_data:
             gantt_df = pd.DataFrame(gantt_data)
-            
-            # Ordre inversé des statuts (Offre à faire en haut)
-            status_order = [
-                "Offre à faire",
-                "Devis envoyé",
-                "Devis signé / Commande confirmée",
-                "En préparation",
-                "En cours",
-                "En pause",
-                "Terminé"
-            ]
+            status_order = ["Offre à faire", "Devis envoyé", "Devis signé / Commande confirmée", 
+                           "En préparation", "En cours", "En pause", "Terminé"]
             
             fig = px.timeline(
                 gantt_df,
@@ -204,12 +195,12 @@ elif st.session_state.current_page == "📅 Planning & Agenda":
                 color="Status",
                 title=f"Vue Gantt - {periode}",
                 hover_data=["Progress"],
-                category_orders={"Status": status_order}   # ← Ordre personnalisé
+                category_orders={"Status": status_order}
             )
             fig.update_layout(height=650, showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Aucune date d'échéance disponible pour le moment.")
+            st.info("Aucune date d'échéance disponible.")
     
     show_todo_list()
 
