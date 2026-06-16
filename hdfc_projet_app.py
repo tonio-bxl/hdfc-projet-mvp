@@ -63,20 +63,14 @@ def list_project_photos(project_id):
         return []
 
 def get_content_type(filename: str) -> str:
-    """Détermine le bon content-type selon l'extension du fichier"""
     content_type, _ = mimetypes.guess_type(filename)
     if content_type and content_type.startswith("image/"):
         return content_type
-    # Fallback selon l'extension
     ext = filename.lower().split('.')[-1]
-    if ext in ["jpg", "jpeg"]:
-        return "image/jpeg"
-    elif ext == "png":
-        return "image/png"
-    elif ext == "gif":
-        return "image/gif"
-    elif ext == "webp":
-        return "image/webp"
+    if ext in ["jpg", "jpeg"]: return "image/jpeg"
+    elif ext == "png": return "image/png"
+    elif ext == "gif": return "image/gif"
+    elif ext == "webp": return "image/webp"
     return "application/octet-stream"
 
 def upload_photo(project_id, uploaded_file):
@@ -84,9 +78,7 @@ def upload_photo(project_id, uploaded_file):
         return None
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     file_name = f"{project_id}/{timestamp}_{uploaded_file.name}"
-    
     content_type = get_content_type(uploaded_file.name)
-    
     try:
         supabase.storage.from_("project-photos").upload(
             path=file_name,
@@ -100,15 +92,12 @@ def upload_photo(project_id, uploaded_file):
 
 def delete_photo(path):
     try:
-        st.write(f"**DEBUG → Chemin :** `{path}`")
         result = supabase.storage.from_("project-photos").remove([path])
-        st.write(f"**DEBUG → Résultat :** {result}")
-
         if result and len(result) > 0:
-            st.success("✅ Photo supprimée avec succès")
+            st.success("✅ Photo supprimée")
             return True
         else:
-            st.error("❌ Rien n'a été supprimé.")
+            st.error("❌ Suppression échouée")
             return False
     except Exception as e:
         st.error(f"Erreur suppression : {e}")
@@ -121,12 +110,23 @@ def add_task_to_project(project_id, task_data):
     supabase.table("tasks").insert({"project_id": project_id, **task_data}).execute()
 
 def show_todo_list():
-    with st.expander("📋 To-Do List", expanded=False):
+    with st.expander("📋 To-Do List - HD Full Concept (mise à jour)", expanded=True):
         st.markdown("""
-        - [x] Suppression photos (résolu avec service_role)
-        - [x] Correction du content-type des photos (image/jpeg, image/png...)
-        - [ ] Formulaire création tâche/catégorie/sous-catégorie
-        - [ ] Upload multiple photos
+        ### ✅ Terminé
+        - [x] Upload photos avec bon content-type (`image/jpeg`, `image/png`...)
+        - [x] Affichage des photos par chantier
+        - [x] Suppression photo avec confirmation (fonctionne avec `service_role`)
+        - [x] Structure dossiers = 1 dossier par chantier dans Storage
+
+        ### 🔥 En cours / Priorité
+        - [ ] Ajouter un **formulaire** pour créer une nouvelle tâche + catégorie + sous-catégorie directement dans l’application
+        - [ ] Permettre l’**upload de plusieurs photos** en même temps
+
+        ### Améliorations futures
+        - [ ] Stocker les métadonnées des photos dans une table Supabase (`project_photos`)
+        - [ ] Pouvoir renommer / réorganiser les photos
+        - [ ] Développer les pages **Encodage Rapide** et **Créer un chantier**
+        - [ ] Recherche avancée dans la Bibliothèque Tâches
         """)
 
 status_colors = {
@@ -217,7 +217,7 @@ elif st.session_state.current_page == "📁 Fiche Chantier":
     with col_btn:
         if uploaded_file and st.button("📤 Upload photo", type="primary"):
             if upload_photo(st.session_state.current_project_id, uploaded_file):
-                st.success("✅ Photo uploadée avec le bon type")
+                st.success("✅ Photo uploadée")
                 st.rerun()
     with col_refresh:
         if st.button("🔄 Rafraîchir les photos"):
